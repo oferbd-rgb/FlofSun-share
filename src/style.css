@@ -1,0 +1,102 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font: 15px/1.4 system-ui, "Segoe UI", Roboto, sans-serif;
+  background: #10141a;
+}
+
+canvas {
+  display: block;
+}
+
+.time-control {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: rgba(20, 24, 32, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  color: #f0f0f0;
+  backdrop-filter: blur(6px);
+}
+
+.time-control button {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: #2a3040;
+  color: #f0f0f0;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.time-control button:hover {
+  background: #38405a;
+}
+
+.time-control input[type="range"] {
+  width: 320px;
+}
+
+.clock-readout {
+  min-width: 3.5em;
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+}
+
+.tz-note {
+  font-size: 11px;
+  color: #9aa0ac;
+  white-space: nowrap;
+}
+
+.date-input {
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: #2a3040;
+  color: #f0f0f0;
+  font-size: 14px;
+  font-family: inherit;
+  color-scheme: dark;
+}
+
+.location-picker {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  width: 260px;
+  padding: 10px;
+  background: rgba(20, 24, 32, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  color: #f0f0f0;
+  backdrop-filter: blur(6px);
+}
+
+.location-picker-map {
+  width: 100%;
+  height: 200px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.location-picker-info {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #d5d8e0;
+}
