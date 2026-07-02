@@ -10,9 +10,11 @@ import {
 } from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { scene as sceneCfg, tracker as trackerCfg } from "./config";
+import { getTrackerGeometry, onGeometryChange } from "./appState";
 import { addCompassLabels } from "./compassLabels";
 import { createSunLightRig, type SunLightRig } from "./sunLight";
 import { createTrackerRow, type TrackerRow } from "./tracker";
+import { rowOffsetToWorldXZ } from "./trackerMath";
 import { addTrees } from "./trees";
 
 export interface AppScene {
@@ -40,13 +42,36 @@ export function createAppScene(canvasContainer: HTMLElement): AppScene {
   addCompassLabels(scene);
   addTrees(scene);
 
+  // Kept as a stable array reference (mutated in place by rebuildRows) rather than reassigned,
+  // so callers that destructured `rows` from this function's return value keep seeing live rows
+  // after a geometry-driven rebuild.
   const rows: TrackerRow[] = [];
-  for (let i = 0; i < trackerCfg.rowCount; i++) {
-    const worldX = (i - (trackerCfg.rowCount - 1) / 2) * trackerCfg.rowSpacing;
-    const row = createTrackerRow(worldX);
-    scene.add(row.group);
-    rows.push(row);
+
+  function rebuildRows(): void {
+    for (const row of rows) {
+      scene.remove(row.group);
+      row.dispose();
+    }
+    rows.length = 0;
+
+    const geometry = getTrackerGeometry();
+    for (let i = 0; i < trackerCfg.rowCount; i++) {
+      const offsetM = (i - (trackerCfg.rowCount - 1) / 2) * geometry.rowSpacingM;
+      const { x, z } = rowOffsetToWorldXZ(offsetM, geometry.axisAzimuthDeg);
+      const row = createTrackerRow({
+        worldX: x,
+        worldZ: z,
+        hubHeightM: geometry.hubHeightM,
+        moduleLengthM: geometry.moduleLengthM,
+        axisAzimuthDeg: geometry.axisAzimuthDeg,
+      });
+      scene.add(row.group);
+      rows.push(row);
+    }
   }
+
+  rebuildRows();
+  onGeometryChange(rebuildRows);
 
   const camera = new PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
   camera.position.set(45, 32, 55);

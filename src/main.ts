@@ -1,14 +1,22 @@
 import "./style.css";
 import { tracker as trackerCfg } from "./config";
-import { getDate, getLocation, onStateChange } from "./appState";
+import { getDate, getLocation, getTrackerGeometry, onStateChange } from "./appState";
 import { getDaylightBounds, getSunAngles, localSolarTimeToDate, sunAzElToVector3 } from "./sunPosition";
 import { computeTrackerRotationDeg } from "./trackerMath";
 import { createAppScene } from "./scene";
 import { createTimeControl } from "./timeControl";
 import { createLocationPicker } from "./locationPicker";
+import { createGeometryControl } from "./geometryControl";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const { scene, camera, renderer, controls, sunLightRig, rows } = createAppScene(app);
+
+const titleEl = document.createElement("div");
+titleEl.className = "app-title";
+titleEl.textContent = "1P Tracker";
+app.appendChild(titleEl);
+
+createGeometryControl(app);
 
 // minutesSinceMidnight is local SOLAR time at the selected site (see sunPosition.ts) —
 // not the browser's system timezone.
@@ -46,7 +54,7 @@ function frame() {
     lastRotationDeg = computeTrackerRotationDeg(
       azimuthDeg,
       altitudeDeg,
-      trackerCfg.axisAzimuthDeg,
+      getTrackerGeometry().axisAzimuthDeg,
       trackerCfg.maxRotationDeg,
     );
   }

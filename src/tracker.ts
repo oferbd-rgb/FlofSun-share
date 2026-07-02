@@ -1,45 +1,66 @@
 import { BoxGeometry, Group, Mesh, MeshStandardMaterial } from "three";
 import { tracker as cfg } from "./config";
+import { axisYawDeg } from "./trackerMath";
 
 const moduleMaterial = new MeshStandardMaterial({ color: 0x1a2a4a, metalness: 0.3, roughness: 0.6 });
 const torqueTubeMaterial = new MeshStandardMaterial({ color: 0x555555, metalness: 0.6, roughness: 0.4 });
 
 export interface TrackerRow {
-  group: Group;
+  group: Group; // outer group: positioned + yawed to the axis bearing, add this to the scene
   setRotationDeg(deg: number): void;
+  dispose(): void; // frees this row's own geometries (call before dropping the row on rebuild)
 }
 
-// Builds one tracker row: a pivot Group centered on the torque-tube axis (world Z, N-S),
-// with `modulesPerRow` modules mounted along it. Rotating the pivot around its local Z axis
-// (the tube's own centerline) sweeps the modules' faces east-west without moving their
-// position along the row — that's the physically correct rotation axis for a torque tube
-// spinning about itself (rotating about X or Y here would incorrectly shift modules along
-// the row as they "rotate").
-export function createTrackerRow(worldX: number): TrackerRow {
-  const group = new Group();
-  group.position.set(worldX, cfg.hubHeight, 0);
+export interface TrackerRowParams {
+  worldX: number;
+  worldZ: number;
+  hubHeightM: number;
+  moduleLengthM: number;
+  axisAzimuthDeg: number;
+}
+
+// Builds one tracker row. Two nested groups keep the two rotations unambiguous (three.js Euler
+// composition order is easy to get backwards): an outer `orientationGroup` is yawed once around
+// world Y so its local Z axis points along the tracker's compass bearing (see axisYawDeg), and
+// an inner `pivotGroup` — whose local Z *is* that bearing — rotates around its own Z every frame
+// to sweep the modules east-west, exactly like a torque tube spinning about its own centerline.
+// Rotating pivotGroup about X or Y instead would incorrectly shift modules along the row.
+export function createTrackerRow(params: TrackerRowParams): TrackerRow {
+  const { worldX, worldZ, hubHeightM, moduleLengthM, axisAzimuthDeg } = params;
+
+  const orientationGroup = new Group();
+  orientationGroup.position.set(worldX, hubHeightM, worldZ);
+  orientationGroup.rotation.y = (axisYawDeg(axisAzimuthDeg) * Math.PI) / 180;
+
+  const pivotGroup = new Group();
+  orientationGroup.add(pivotGroup);
 
   const n = cfg.modulesPerRow;
-  const pitch = cfg.moduleLength + cfg.moduleGap;
-  const totalLength = n * cfg.moduleLength + (n - 1) * cfg.moduleGap;
+  const pitch = moduleLengthM + cfg.moduleGap;
+  const totalLength = n * moduleLengthM + (n - 1) * cfg.moduleGap;
 
   const tubeSide = cfg.torqueTubeRadius * 2;
-  const torqueTube = new Mesh(new BoxGeometry(tubeSide, tubeSide, totalLength + tubeSide), torqueTubeMaterial);
-  group.add(torqueTube);
+  const torqueTubeGeometry = new BoxGeometry(tubeSide, tubeSide, totalLength + tubeSide);
+  const torqueTube = new Mesh(torqueTubeGeometry, torqueTubeMaterial);
+  pivotGroup.add(torqueTube);
 
-  const moduleGeometry = new BoxGeometry(cfg.moduleWidth, cfg.moduleThickness, cfg.moduleLength);
+  const moduleGeometry = new BoxGeometry(cfg.moduleWidth, cfg.moduleThickness, moduleLengthM);
   for (let i = 0; i < n; i++) {
     const zOffset = (i - (n - 1) / 2) * pitch;
     const module = new Mesh(moduleGeometry, moduleMaterial);
     module.position.set(0, 0, zOffset);
     module.castShadow = true;
-    group.add(module);
+    pivotGroup.add(module);
   }
 
   return {
-    group,
+    group: orientationGroup,
     setRotationDeg(deg: number) {
-      group.rotation.z = (deg * Math.PI) / 180;
+      pivotGroup.rotation.z = (deg * Math.PI) / 180;
+    },
+    dispose() {
+      torqueTubeGeometry.dispose();
+      moduleGeometry.dispose();
     },
   };
 }
