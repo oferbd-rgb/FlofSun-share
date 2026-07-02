@@ -10,9 +10,11 @@ import {
   WebGLRenderer,
 } from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { scene as sceneCfg, tracker as trackerCfg } from "./config";
+import { billboards as billboardCfg, scene as sceneCfg, tracker as trackerCfg } from "./config";
 import { getTrackerGeometry, onGeometryChange } from "./appState";
+import { createBillboard, loadLogoImage } from "./billboard";
 import { addCompassLabels } from "./compassLabels";
+import { createGroundTexture } from "./groundTexture";
 import { createSunLightRig, type SunLightRig } from "./sunLight";
 import { createTrackerRow, type TrackerRow } from "./tracker";
 import { addTrees } from "./trees";
@@ -32,7 +34,7 @@ export function createAppScene(canvasContainer: HTMLElement): AppScene {
 
   const ground = new Mesh(
     new PlaneGeometry(sceneCfg.groundSize, sceneCfg.groundSize),
-    new MeshStandardMaterial({ color: 0x4a5d3a }),
+    new MeshStandardMaterial({ map: createGroundTexture(), roughness: 0.95 }),
   );
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
@@ -42,6 +44,21 @@ export function createAppScene(canvasContainer: HTMLElement): AppScene {
   const sunLightRig = createSunLightRig(scene);
   addCompassLabels(scene);
   addTrees(scene);
+
+  loadLogoImage(billboardCfg.logoUrl).then((logoImage) => {
+    for (const sign of billboardCfg.signs) {
+      const billboard = createBillboard({
+        worldX: sign.worldX,
+        worldZ: sign.worldZ,
+        facingAzimuthDeg: sign.facingAzimuthDeg,
+        widthM: billboardCfg.widthM,
+        heightM: billboardCfg.heightM,
+        hoverHeightM: billboardCfg.hoverHeightM,
+        logoImage,
+      });
+      scene.add(billboard);
+    }
+  });
 
   // Kept as a stable array reference (mutated in place by rebuildRows) rather than reassigned,
   // so callers that destructured `rows` from this function's return value keep seeing live rows

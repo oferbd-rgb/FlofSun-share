@@ -53,3 +53,15 @@ export const scene = {
 export const animation = {
   simMinutesPerRealSecond: 30, // ~1440 min / 30 => full day sweeps in ~48s when playing
 };
+
+export const billboards = {
+  logoUrl: "/edf-logo.svg",
+  widthM: 3,
+  heightM: 0.5,
+  hoverHeightM: 1.5, // gap under the sign so it casts a shadow onto the ground, not touching it
+  // Positions/facing eyeballed from the user's screenshot markup — nudge freely.
+  signs: [
+    { worldX: -14, worldZ: -10, facingAzimuthDeg: 180 }, // near the NW tree, facing south
+    { worldX: 8, worldZ: 16, facingAzimuthDeg: 0 }, // toward the S edge, facing north
+  ],
+};

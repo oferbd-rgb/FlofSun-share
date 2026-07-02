@@ -84,6 +84,15 @@ the file operations npm needs. Work on a real local disk.
   hub height, row spacing, and axis azimuth, writing straight into `appState.ts`'s tracker
   geometry state on change. Module width stays a fixed constant in `config.ts` — not exposed
   here.
+- **`src/groundTexture.ts`** — a small procedural canvas texture (lighter, speckled green,
+  tiled via `RepeatWrapping`) used as the ground's `map`, instead of a single flat color.
+- **`src/billboard.ts`** — single-sided signs textured with a logo image (`config.ts`'s
+  `billboards.logoUrl`, currently `public/edf-logo.svg`), letterboxed to fit a fixed
+  width/height without distorting the logo's aspect ratio, with a hard alpha cutout
+  (`alphaTest`, no `transparent`) so there's no solid background panel and the cast shadow
+  follows the logo's silhouette. `facingAzimuthDeg` yaws the whole mesh (geometry + texture
+  together) around world Y — a pure rotation, so the logo reads correctly (not mirrored) from
+  whichever direction it's rotated to face.
 - **`src/suncalc.d.ts`** — local ambient type declaration. The published `@types/suncalc` still
   reflects suncalc's old v1.x API (radians, azimuth from south); suncalc v2.x is a breaking
   rewrite (degrees, azimuth clockwise from north). Don't `npm install @types/suncalc` and trust
@@ -104,3 +113,7 @@ layout — see the on-screen title.
   primary ask).
 - Nominatim reverse-geocoding is a live network call; there's no offline fallback beyond a raw
   lat/lon label.
+- `public/edf-logo.svg` is downloaded from [Wikimedia Commons](https://upload.wikimedia.org/wikipedia/commons/3/30/EDF_Power_Solutions_Logo.svg),
+  marked public-domain there as "only simple geometric shapes and text," but the file page
+  notes the EDF Power Solutions name/mark itself may still be trademarked — this demo uses it
+  for a personal, non-commercial visualization.
