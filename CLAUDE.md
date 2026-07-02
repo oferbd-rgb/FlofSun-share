@@ -7,8 +7,10 @@ non-obvious decisions (local solar time model, tracker rotation axis, suncalc v2
 
 - `npm install && npm run dev` — do this on a real local disk, not a cloud-synced folder (see
   README's "Running it" section for why).
-- `npx tsc --noEmit` — type-check; this project has no test suite yet, so this plus visually
-  checking the running app (`npm run dev`) is the verification loop.
+- `npx tsc --noEmit` — type-check.
+- `npm test` — runs the (currently small) vitest suite covering the pure math modules,
+  starting with `trackerMath.ts`. Combine with visually checking the running app
+  (`npm run dev`) for anything touching rendering/UI.
 - Config lives in one place: `src/config.ts`. Prefer adding a named constant there over
   hardcoding a number in a component file.
 - `src/trackerMath.ts` and `src/sunPosition.ts` are intentionally kept free of three.js
