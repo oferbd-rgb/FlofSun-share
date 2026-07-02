@@ -1,4 +1,5 @@
 import {
+  Color,
   HemisphereLight,
   Mesh,
   MeshStandardMaterial,
@@ -14,7 +15,6 @@ import { getTrackerGeometry, onGeometryChange } from "./appState";
 import { addCompassLabels } from "./compassLabels";
 import { createSunLightRig, type SunLightRig } from "./sunLight";
 import { createTrackerRow, type TrackerRow } from "./tracker";
-import { rowOffsetToWorldXZ } from "./trackerMath";
 import { addTrees } from "./trees";
 
 export interface AppScene {
@@ -28,6 +28,7 @@ export interface AppScene {
 
 export function createAppScene(canvasContainer: HTMLElement): AppScene {
   const scene = new Scene();
+  scene.background = new Color(sceneCfg.skyColor);
 
   const ground = new Mesh(
     new PlaneGeometry(sceneCfg.groundSize, sceneCfg.groundSize),
@@ -56,14 +57,11 @@ export function createAppScene(canvasContainer: HTMLElement): AppScene {
 
     const geometry = getTrackerGeometry();
     for (let i = 0; i < trackerCfg.rowCount; i++) {
-      const offsetM = (i - (trackerCfg.rowCount - 1) / 2) * geometry.rowSpacingM;
-      const { x, z } = rowOffsetToWorldXZ(offsetM, geometry.axisAzimuthDeg);
+      const worldX = (i - (trackerCfg.rowCount - 1) / 2) * geometry.rowSpacingM;
       const row = createTrackerRow({
-        worldX: x,
-        worldZ: z,
+        worldX,
         hubHeightM: geometry.hubHeightM,
         moduleLengthM: geometry.moduleLengthM,
-        axisAzimuthDeg: geometry.axisAzimuthDeg,
       });
       scene.add(row.group);
       rows.push(row);

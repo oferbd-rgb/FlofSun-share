@@ -54,25 +54,28 @@ the file operations npm needs. Work on a real local disk.
     silently defaulting to a fake 06:00–18:00 window.
 - **`src/trackerMath.ts`** — pure tracker geometry math, no three.js dependency, independently
   testable:
-  - `computeTrackerRotationDeg` — single-axis tracking formula for a horizontal axis at an
-    arbitrary compass bearing (`rotation = atan2(sin(axisAzimuth - solarAzimuth),
-    tan(solarElevation))`, clamped). Note the subtraction order (axis minus solar, not the
-    reverse) — that's what makes `axisAzimuthDeg=0` (a plain north-south axis) rotate correctly
-    given how `tracker.ts` maps `rotation.z` to which side of the row tilts up.
-  - `rowOffsetToWorldXZ` / `axisYawDeg` — position and yaw a row perpendicular to /
-    aligned with an arbitrary axis bearing, using the same azimuth convention as
-    `sunAzElToVector3`.
-- **`src/tracker.ts`** — builds one tracker row as two nested groups (avoids relying on three.js's
-  Euler rotation-composition order, which is easy to get backwards): an outer `orientationGroup`
-  yawed once (via `axisYawDeg`) so its local Z axis points along the tracker's axis bearing, and
-  an inner `pivotGroup` that rotates around its own local **Z axis** (the torque tube's own
-  centerline) every frame to sweep the modules east-west — rotating around X or Y here would
-  incorrectly shift modules along the row.
-- **`src/scene.ts`** / **`src/sunLight.ts`** — assembles the three.js scene: ground, the
-  shadow-casting `DirectionalLight` positioned along the computed sun vector, a visible sun
-  marker sphere, tracker rows, compass labels (N/E/S/W), and a few static trees (so shadow
-  behavior is visible independent of the moving panels). `scene.ts` rebuilds the tracker rows
-  (disposing the old per-row geometries first) whenever `onGeometryChange` fires.
+  - `computeTrackerRotationDeg` — single-axis tracking formula (`rotation = atan2(sin(axisAzimuth
+    - solarAzimuth), tan(solarElevation))`, clamped). Note the subtraction order (axis minus
+    solar, not the reverse) — that's what makes `axisAzimuthDeg=0` (a plain north-south axis)
+    rotate correctly given how `tracker.ts` maps `rotation.z` to which side of the row tilts up.
+    `axisAzimuthDeg` only changes this tracking-angle calculation; it does **not** rotate the row
+    in 3D (see `tracker.ts`) — an earlier version tried to do both, using a yaw rotation on the
+    row group, but combining a yaw with this formula's sign convention without re-deriving the
+    formula for it flipped the default tracking direction. Removed rather than re-derived, to
+    keep this formula's correctness easy to verify.
+- **`src/tracker.ts`** — builds one tracker row (a pivot `Group` + N modules), always laid out
+  along the world Z axis (N-S) regardless of `axisAzimuthDeg`. The pivot rotates around its
+  local **Z axis** (the torque tube's own centerline) every frame to sweep the modules east-west
+  — rotating around X or Y here would incorrectly shift modules along the row. Modules are
+  mounted **1P (one-in-portrait)**: `moduleWidth` (fixed) runs *along* the axis (the row-pitch
+  dimension) and `moduleLength` (adjustable) runs *across* it — the dimension that actually
+  sweeps toward/away from the sun as the row tilts.
+- **`src/scene.ts`** / **`src/sunLight.ts`** — assembles the three.js scene: a light-sky-blue
+  background (`sceneCfg.skyColor`), ground, the shadow-casting `DirectionalLight` positioned
+  along the computed sun vector, a visible sun marker sphere, tracker rows, compass labels
+  (N/E/S/W), and a few static trees (so shadow behavior is visible independent of the moving
+  panels). `scene.ts` rebuilds the tracker rows (disposing the old per-row geometries first)
+  whenever `onGeometryChange` fires.
 - **`src/timeControl.ts`** — the date input + time slider + play/pause UI.
 - **`src/locationPicker.ts`** — the Leaflet world-map panel; click anywhere to relocate, with
   live reverse-geocoding via OpenStreetMap Nominatim (needs internet; falls back to a raw
@@ -91,9 +94,12 @@ layout — see the on-screen title.
 
 ## Known limitations / possible next steps
 
-- Single-axis (horizontal, any compass bearing) tracking only — no dual-axis or backtracking
-  (backtracking exists in real installations purely to prevent row-to-row self-shading for
-  energy-yield accuracy, not needed for this visualization).
+- Single-axis (horizontal N-S) tracking only — no dual-axis or backtracking (backtracking exists
+  in real installations purely to prevent row-to-row self-shading for energy-yield accuracy, not
+  needed for this visualization).
+- The "Axis azimuth" control changes the tracking-angle calculation but rows are always drawn
+  along the north-south line — the row layout itself doesn't visually rotate to match a
+  non-default axis azimuth yet (see `trackerMath.ts`).
 - No video export yet (was scoped as a stretch goal — interactive browser viewing was the
   primary ask).
 - Nominatim reverse-geocoding is a live network call; there's no offline fallback beyond a raw
