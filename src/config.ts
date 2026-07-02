@@ -48,6 +48,7 @@ export const tracker = {
 export const scene = {
   groundSize: 60, // m, square ground plane
   skyColor: 0xaee2fb, // light sky blue — three.js Scene background
+  sunMarkerDistance: 40, // groundSize/2 + 10 — radius for both the sun marker and the sun-path ring
 };
 
 export const animation = {
@@ -56,12 +57,18 @@ export const animation = {
 
 export const billboards = {
   logoUrl: "/edf-logo.svg",
-  widthM: 3,
-  heightM: 0.5,
+  widthM: 9, // "twice the size of a tree" per feedback (trees are ~4-5m tall/wide)
+  heightM: 1.5,
   hoverHeightM: 1.5, // gap under the sign so it casts a shadow onto the ground, not touching it
-  // Positions/facing eyeballed from the user's screenshot markup — nudge freely.
+  // Positions/facing eyeballed from the user's screenshot markup, then moved toward the SE
+  // corner of the ground (groundSize/2 = 30) per feedback — nudge freely.
   signs: [
-    { worldX: -14, worldZ: -10, facingAzimuthDeg: 180 }, // near the NW tree, facing south
-    { worldX: 8, worldZ: 16, facingAzimuthDeg: 0 }, // toward the S edge, facing north
+    { worldX: 20, worldZ: 18, facingAzimuthDeg: 180 }, // facing south
+    { worldX: 20, worldZ: 22, facingAzimuthDeg: 0 }, // facing north
   ],
+};
+
+export const sunPath = {
+  color: 0xffdd33,
+  sampleCount: 144, // every 10 minutes across 24h
 };

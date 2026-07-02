@@ -86,13 +86,19 @@ the file operations npm needs. Work on a real local disk.
   here.
 - **`src/groundTexture.ts`** — a small procedural canvas texture (lighter, speckled green,
   tiled via `RepeatWrapping`) used as the ground's `map`, instead of a single flat color.
-- **`src/billboard.ts`** — single-sided signs textured with a logo image (`config.ts`'s
-  `billboards.logoUrl`, currently `public/edf-logo.svg`), letterboxed to fit a fixed
-  width/height without distorting the logo's aspect ratio, with a hard alpha cutout
-  (`alphaTest`, no `transparent`) so there's no solid background panel and the cast shadow
-  follows the logo's silhouette. `facingAzimuthDeg` yaws the whole mesh (geometry + texture
-  together) around world Y — a pure rotation, so the logo reads correctly (not mirrored) from
-  whichever direction it's rotated to face.
+- **`src/billboard.ts`** — signs textured with a logo image (`config.ts`'s `billboards.logoUrl`,
+  currently `public/edf-logo.svg`), letterboxed to fit a fixed width/height without distorting
+  the logo's aspect ratio, with a hard alpha cutout (`alphaTest`, no `transparent`) so there's
+  no solid background panel and the cast shadow follows the logo's silhouette.
+  `facingAzimuthDeg` yaws the whole mesh (geometry + texture together) around world Y. Rendered
+  `DoubleSide` so it's always visible regardless of viewing direction — reads correctly from
+  the configured facing direction, mirrored from the opposite side (the same tradeoff a real
+  static decal has).
+- **`src/sunPath.ts`** — a closed yellow ring (`LineLoop`) tracing the sun's *full* diurnal
+  circle for the current date/site (not just the above-horizon daylight arc), sampled at
+  `config.ts`'s `sunPath.sampleCount` points across 24h and projected at the same radius as the
+  sun marker (`scene.sunMarkerDistance`) via `sunAzElToVector3`, so the ring passes through
+  wherever the marker sits at any time. Rebuilt on `onStateChange` (location/date).
 - **`src/suncalc.d.ts`** — local ambient type declaration. The published `@types/suncalc` still
   reflects suncalc's old v1.x API (radians, azimuth from south); suncalc v2.x is a breaking
   rewrite (degrees, azimuth clockwise from north). Don't `npm install @types/suncalc` and trust

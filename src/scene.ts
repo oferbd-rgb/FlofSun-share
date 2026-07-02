@@ -11,11 +11,12 @@ import {
 } from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { billboards as billboardCfg, scene as sceneCfg, tracker as trackerCfg } from "./config";
-import { getTrackerGeometry, onGeometryChange } from "./appState";
+import { getDate, getLocation, getTrackerGeometry, onGeometryChange, onStateChange } from "./appState";
 import { createBillboard, loadLogoImage } from "./billboard";
 import { addCompassLabels } from "./compassLabels";
 import { createGroundTexture } from "./groundTexture";
 import { createSunLightRig, type SunLightRig } from "./sunLight";
+import { createSunPath } from "./sunPath";
 import { createTrackerRow, type TrackerRow } from "./tracker";
 import { addTrees } from "./trees";
 
@@ -44,6 +45,14 @@ export function createAppScene(canvasContainer: HTMLElement): AppScene {
   const sunLightRig = createSunLightRig(scene);
   addCompassLabels(scene);
   addTrees(scene);
+
+  const initialLocation = getLocation();
+  const sunPath = createSunPath(getDate(), initialLocation.latitude, initialLocation.longitude, sceneCfg.sunMarkerDistance);
+  scene.add(sunPath.line);
+  onStateChange(() => {
+    const loc = getLocation();
+    sunPath.update(getDate(), loc.latitude, loc.longitude, sceneCfg.sunMarkerDistance);
+  });
 
   loadLogoImage(billboardCfg.logoUrl).then((logoImage) => {
     for (const sign of billboardCfg.signs) {

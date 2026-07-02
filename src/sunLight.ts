@@ -10,7 +10,6 @@ import {
 import { scene as sceneCfg } from "./config";
 
 const SUN_DISTANCE = 100; // distance for the shadow-casting light — arbitrary, just needs to be "far"
-const SUN_MARKER_DISTANCE = sceneCfg.groundSize / 2 + 10; // closer, so the visible sun marker stays in frame
 
 export interface SunLightRig {
   light: DirectionalLight;
@@ -49,7 +48,7 @@ export function createSunLightRig(scene: Scene): SunLightRig {
     updateSunPosition(sunDir: Vector3) {
       light.position.copy(sunDir).multiplyScalar(SUN_DISTANCE);
       light.target.position.set(0, 0, 0);
-      sunMarker.position.copy(sunDir).multiplyScalar(SUN_MARKER_DISTANCE);
+      sunMarker.position.copy(sunDir).multiplyScalar(sceneCfg.sunMarkerDistance);
       // Below the horizon: keep both parked/hidden so nothing NaNs out and the marker
       // doesn't show through the ground.
       const aboveHorizon = sunDir.y > 0;

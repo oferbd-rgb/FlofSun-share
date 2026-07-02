@@ -1,4 +1,4 @@
-import { FrontSide, Mesh, MeshStandardMaterial, PlaneGeometry, CanvasTexture, SRGBColorSpace } from "three";
+import { DoubleSide, Mesh, MeshStandardMaterial, PlaneGeometry, CanvasTexture, SRGBColorSpace } from "three";
 
 export interface BillboardParams {
   worldX: number;
@@ -21,16 +21,19 @@ export function loadLogoImage(url: string): Promise<HTMLImageElement> {
   });
 }
 
-// A single-sided sign: a thin plane textured with the logo, letterboxed (transparent padding)
-// to fit widthM x heightM without distorting its aspect ratio, and hard-cutout via alphaTest so
-// only the logo shape itself is opaque — "no solid background" — which also means its cast
-// shadow follows the logo's silhouette rather than a solid rectangle.
+// A sign: a thin plane textured with the logo, letterboxed (transparent padding) to fit
+// widthM x heightM without distorting its aspect ratio, and hard-cutout via alphaTest so only
+// the logo shape itself is opaque — "no solid background" — which also means its cast shadow
+// follows the logo's silhouette rather than a solid rectangle.
+//
+// DoubleSide so it's guaranteed visible from either direction (the logo reads correctly from
+// facingAzimuthDeg's side, mirrored from the opposite side — the same tradeoff a real static
+// decal/sticker has, and simpler/more robust than relying on single-sided face culling lining
+// up exactly with a specific viewing direction).
 //
 // The plane's default (unrotated) normal points +Z (south, matching sunPosition.ts's
-// convention), so facingAzimuthDeg=180 needs no rotation; other bearings yaw the whole rigid
-// mesh (geometry + texture together) around world Y. This is a pure rotation — unlike mirroring
-// the texture, rotating the whole mesh keeps the logo reading correctly (not backwards) to a
-// viewer standing on its new front side, exactly like physically turning a rigid sign post.
+// convention), so facingAzimuthDeg=180 needs no rotation; other bearings yaw the whole mesh
+// (geometry + texture together) around world Y.
 export function createBillboard(params: BillboardParams): Mesh {
   const { worldX, worldZ, facingAzimuthDeg, widthM, heightM, hoverHeightM, logoImage } = params;
 
@@ -51,7 +54,7 @@ export function createBillboard(params: BillboardParams): Mesh {
   const material = new MeshStandardMaterial({
     map: texture,
     alphaTest: 0.4, // hard cutout instead of alpha blending — no solid background panel
-    side: FrontSide, // single-sided, like a real sign: invisible/unreadable from the back
+    side: DoubleSide,
     roughness: 0.6,
   });
 
