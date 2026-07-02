@@ -19,7 +19,7 @@ export function sunAzElToVector3(azimuthDeg: number, altitudeDeg: number): Vecto
   return new Vector3(
     Math.sin(azRad) * Math.cos(elRad), // east component
     Math.sin(elRad), // up component
-    Math.cos(azRad) * Math.cos(elRad), // south component
+    -Math.cos(azRad) * Math.cos(elRad), // south component (azimuth is clockwise from north, so north = -south)
   );
 }
 
