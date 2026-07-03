@@ -30,7 +30,7 @@ export function addTrees(scene: Scene): void {
     [-edge, -edge + 4, 1.1],
     [-edge + 6, -edge, 0.9],
     [edge - 4, -edge + 2, 1.0],
-    [edge, edge - 6, 1.2],
+    // Was [edge, edge - 6, 1.2] — removed, it sat right next to the EDF billboard (20, 18).
     [-edge + 3, edge - 3, 0.8],
   ];
 

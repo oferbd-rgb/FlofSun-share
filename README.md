@@ -104,6 +104,13 @@ the file operations npm needs. Work on a real local disk.
   `config.ts`'s `sunPath.sampleCount` points across 24h and projected at the same radius as the
   sun marker (`scene.sunMarkerDistance`) via `sunAzElToVector3`, so the ring passes through
   wherever the marker sits at any time. Rebuilt on `onStateChange` (location/date).
+- **`src/crossSectionView.ts`** — a second, small `OrthographicCamera` view of the *same*
+  `Scene` (rendered with its own `WebGLRenderer`/canvas each frame, right after the main view —
+  see `main.ts`), showing an east-west elevation of the tracker field up to `crossSection.heightM`
+  (config.ts). Tilted down slightly rather than perfectly horizontal — a flat ground viewed
+  exactly edge-on has zero apparent screen area, so shadows lying on it would be invisible;
+  the tilt trades a bit of elevation purity for actually being able to see them. No
+  `OrbitControls` — it's a fixed reference view, not meant to be manipulated.
 - **`src/suncalc.d.ts`** — local ambient type declaration. The published `@types/suncalc` still
   reflects suncalc's old v1.x API (radians, azimuth from south); suncalc v2.x is a breaking
   rewrite (degrees, azimuth clockwise from north). Don't `npm install @types/suncalc` and trust

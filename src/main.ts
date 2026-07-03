@@ -7,6 +7,7 @@ import { createAppScene } from "./scene";
 import { createTimeControl } from "./timeControl";
 import { createLocationPicker } from "./locationPicker";
 import { createGeometryControl } from "./geometryControl";
+import { createCrossSectionView } from "./crossSectionView";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const { scene, camera, renderer, controls, sunLightRig, rows } = createAppScene(app);
@@ -17,6 +18,7 @@ titleEl.textContent = "1P Tracker";
 app.appendChild(titleEl);
 
 createGeometryControl(app);
+const crossSectionView = createCrossSectionView(app);
 
 // minutesSinceMidnight is local SOLAR time at the selected site (see sunPosition.ts) —
 // not the browser's system timezone.
@@ -64,6 +66,7 @@ function frame() {
 
   controls.update();
   renderer.render(scene, camera);
+  crossSectionView.render(scene);
   requestAnimationFrame(frame);
 }
 
