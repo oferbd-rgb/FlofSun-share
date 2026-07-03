@@ -1,13 +1,12 @@
 import "./style.css";
 import { tracker as trackerCfg } from "./config";
-import { getDate, getLocation, getTrackerGeometry, onStateChange } from "./appState";
+import { getDate, getLocation, getTrackerGeometry, getTrackingMode, onStateChange } from "./appState";
 import { getDaylightBounds, getSunAngles, localSolarTimeToDate, sunAzElToVector3 } from "./sunPosition";
-import { computeTrackerRotationDeg } from "./trackerMath";
+import { computeAntiTrackingRotationDeg, computeTrackerRotationDeg } from "./trackerMath";
 import { createAppScene } from "./scene";
 import { createTimeControl } from "./timeControl";
 import { createLocationPicker } from "./locationPicker";
 import { createGeometryControl } from "./geometryControl";
-import { createCrossSectionView } from "./crossSectionView";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const { scene, camera, renderer, controls, sunLightRig, rows } = createAppScene(app);
@@ -18,7 +17,6 @@ titleEl.textContent = "1P Tracker";
 app.appendChild(titleEl);
 
 createGeometryControl(app);
-const crossSectionView = createCrossSectionView(app);
 
 // minutesSinceMidnight is local SOLAR time at the selected site (see sunPosition.ts) —
 // not the browser's system timezone.
@@ -53,12 +51,23 @@ function frame() {
   sunLightRig.updateSunPosition(sunDir);
 
   if (altitudeDeg > 0) {
-    lastRotationDeg = computeTrackerRotationDeg(
+    const geometry = getTrackerGeometry();
+    const trackingRotationDeg = computeTrackerRotationDeg(
       azimuthDeg,
       altitudeDeg,
-      getTrackerGeometry().axisAzimuthDeg,
+      geometry.axisAzimuthDeg,
       trackerCfg.maxRotationDeg,
     );
+    lastRotationDeg =
+      getTrackingMode() === "track"
+        ? trackingRotationDeg
+        : computeAntiTrackingRotationDeg(
+            trackingRotationDeg,
+            trackerCfg.maxRotationDeg,
+            geometry.moduleLengthM,
+            sunDir.x,
+            sunDir.y,
+          );
   }
   for (const row of rows) {
     row.setRotationDeg(lastRotationDeg);
@@ -66,7 +75,6 @@ function frame() {
 
   controls.update();
   renderer.render(scene, camera);
-  crossSectionView.render(scene);
   requestAnimationFrame(frame);
 }
 

@@ -63,6 +63,12 @@ the file operations npm needs. Work on a real local disk.
     row group, but combining a yaw with this formula's sign convention without re-deriving the
     formula for it flipped the default tracking direction. Removed rather than re-derived, to
     keep this formula's correctness easy to verify.
+  - `computeShadowFootprintWidthM` / `computeAntiTrackingRotationDeg` — support the
+    Tracking/Anti-tracking toggle in `geometryControl.ts`. Anti-tracking rotates 90deg off the
+    sun-facing angle (clamped to `maxRotationDeg`, so in practice it mostly drives to one of the
+    two mechanical end-stops) toward whichever side — east or west — casts the smaller shadow,
+    per `computeShadowFootprintWidthM`'s east-west shadow-edge projection for that candidate
+    angle and the current sun direction.
 - **`src/tracker.ts`** — builds one tracker row as two nested groups: an outer `anchorGroup` at
   ground level, never rotated, holding `tracker.postCount` static ground-to-hub support posts
   (one at each end of the row, the rest evenly spaced); and an inner `pivotGroup`, translated up
@@ -85,10 +91,10 @@ the file operations npm needs. Work on a real local disk.
 - **`src/locationPicker.ts`** — the Leaflet world-map panel; click anywhere to relocate, with
   live reverse-geocoding via OpenStreetMap Nominatim (needs internet; falls back to a raw
   lat/lon label if the request fails).
-- **`src/geometryControl.ts`** — the "Tracker geometry" panel: number inputs for module length,
-  hub height, row spacing, and axis azimuth, writing straight into `appState.ts`'s tracker
-  geometry state on change. Module width stays a fixed constant in `config.ts` — not exposed
-  here.
+- **`src/geometryControl.ts`** — the "Tracker geometry" panel: a Tracking/Anti-tracking mode
+  toggle button, plus number inputs for module length, hub height, row spacing, and axis
+  azimuth, writing straight into `appState.ts`'s tracker geometry state on change. Module width
+  stays a fixed constant in `config.ts` — not exposed here.
 - **`src/groundTexture.ts`** — a small procedural canvas texture (lighter, speckled green,
   tiled via `RepeatWrapping`) used as the ground's `map`, instead of a single flat color.
 - **`src/billboard.ts`** — signs textured with a logo image (`config.ts`'s `billboards.logoUrl`,
@@ -104,13 +110,6 @@ the file operations npm needs. Work on a real local disk.
   `config.ts`'s `sunPath.sampleCount` points across 24h and projected at the same radius as the
   sun marker (`scene.sunMarkerDistance`) via `sunAzElToVector3`, so the ring passes through
   wherever the marker sits at any time. Rebuilt on `onStateChange` (location/date).
-- **`src/crossSectionView.ts`** — a second, small `OrthographicCamera` view of the *same*
-  `Scene` (rendered with its own `WebGLRenderer`/canvas each frame, right after the main view —
-  see `main.ts`), showing an east-west elevation of the tracker field up to `crossSection.heightM`
-  (config.ts). Tilted down slightly rather than perfectly horizontal — a flat ground viewed
-  exactly edge-on has zero apparent screen area, so shadows lying on it would be invisible;
-  the tilt trades a bit of elevation purity for actually being able to see them. No
-  `OrbitControls` — it's a fixed reference view, not meant to be manipulated.
 - **`src/suncalc.d.ts`** — local ambient type declaration. The published `@types/suncalc` still
   reflects suncalc's old v1.x API (radians, azimuth from south); suncalc v2.x is a breaking
   rewrite (degrees, azimuth clockwise from north). Don't `npm install @types/suncalc` and trust

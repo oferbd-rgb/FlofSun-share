@@ -37,6 +37,14 @@ let currentTrackerGeometry: TrackerGeometryState = {
   axisAzimuthDeg: trackerDefaults.axisAzimuthDeg,
 };
 
+// "track" faces the sun directly (computeTrackerRotationDeg). "anti-track" rotates 90deg off
+// that angle instead, toward whichever side gives the smaller shadow footprint — see
+// trackerMath.ts's computeAntiTrackingRotationDeg. Read directly each frame in main.ts's loop,
+// so no pub-sub is needed here.
+export type TrackingMode = "track" | "anti-track";
+
+let currentTrackingMode: TrackingMode = "track";
+
 const listeners: Array<() => void> = [];
 const geometryListeners: Array<() => void> = [];
 
@@ -73,6 +81,14 @@ export function getTrackerGeometry(): TrackerGeometryState {
 export function setTrackerGeometry(next: TrackerGeometryState): void {
   currentTrackerGeometry = next;
   notifyGeometry();
+}
+
+export function getTrackingMode(): TrackingMode {
+  return currentTrackingMode;
+}
+
+export function setTrackingMode(next: TrackingMode): void {
+  currentTrackingMode = next;
 }
 
 // Fires whenever location OR date changes — either can shift sunrise/sunset bounds and the

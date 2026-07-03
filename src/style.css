@@ -158,25 +158,25 @@ canvas {
   font-family: inherit;
 }
 
-.cross-section-view {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  padding: 10px;
-  background: rgba(20, 24, 32, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 10px;
-  backdrop-filter: blur(6px);
-}
-
-.cross-section-title {
+.geometry-control-mode-button {
+  width: 100%;
+  padding: 6px 0;
+  margin-bottom: 4px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: #2a3040;
+  color: #f0f0f0;
+  cursor: pointer;
   font-size: 12px;
   font-weight: 600;
-  margin-bottom: 6px;
-  color: #d5d8e0;
+  font-family: inherit;
 }
 
-.cross-section-view canvas {
-  border-radius: 6px;
-  display: block;
+.geometry-control-mode-button:hover {
+  background: #38405a;
+}
+
+.geometry-control-mode-button.is-anti-tracking {
+  background: #5a3a1e;
+  border-color: rgba(255, 190, 120, 0.4);
 }

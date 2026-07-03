@@ -1,4 +1,10 @@
-import { getTrackerGeometry, setTrackerGeometry, type TrackerGeometryState } from "./appState";
+import {
+  getTrackerGeometry,
+  getTrackingMode,
+  setTrackerGeometry,
+  setTrackingMode,
+  type TrackerGeometryState,
+} from "./appState";
 
 interface FieldSpec {
   key: keyof TrackerGeometryState;
@@ -33,6 +39,21 @@ export function createGeometryControl(container: HTMLElement): void {
   title.className = "geometry-control-title";
   title.textContent = "Tracker geometry";
   panel.appendChild(title);
+
+  const modeButton = document.createElement("button");
+  modeButton.className = "geometry-control-mode-button";
+  modeButton.title = "Anti-tracking rotates 90deg off the sun-facing angle instead, toward whichever side casts the smaller shadow.";
+  function refreshModeButton(): void {
+    const isTracking = getTrackingMode() === "track";
+    modeButton.textContent = isTracking ? "Tracking" : "Anti-tracking";
+    modeButton.classList.toggle("is-anti-tracking", !isTracking);
+  }
+  modeButton.addEventListener("click", () => {
+    setTrackingMode(getTrackingMode() === "track" ? "anti-track" : "track");
+    refreshModeButton();
+  });
+  refreshModeButton();
+  panel.appendChild(modeButton);
 
   for (const field of FIELDS) {
     const row = document.createElement("label");

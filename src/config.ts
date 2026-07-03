@@ -80,14 +80,3 @@ export const shadeLine = {
   widthM: 1, // north-south width of the strip
   worldZ: 0, // crosses through the tracker field's center
 };
-
-// A second, small orthographic (true-scale, no perspective) view of the same scene, looking due
-// north along the world Z axis — an east-west elevation showing tracker tilt profile and the
-// shadows they cast on the ground, independent of the main view's angle. heightM matches the
-// geometry panel's hub-height slider max, so raising hub height to its limit still fits.
-export const crossSection = {
-  heightM: 10,
-  halfWidthM: 18, // shown range is -halfWidthM to +halfWidthM (east-west)
-  pixelWidth: 324,
-  pixelHeight: 90, // matches (2*halfWidthM)/heightM so the view isn't stretched
-};

@@ -43,3 +43,46 @@ export function computeTrackerRotationDeg(
   const rotationDeg = rotationRad * RAD2DEG;
   return clamp(rotationDeg, -maxRotationDeg, maxRotationDeg);
 }
+
+// East-west width (m) of the shadow a panel casts, given its rotation angle and the sun's
+// east-west/up direction components (sunDirX, sunDirY from sunAzElToVector3's Vector3 — the
+// north-south component doesn't affect this, since shadow east-west spread from a horizontal
+// light only depends on the dx/dy ratio). Ignores hub height deliberately: translating the
+// panel up shifts both of its shadow-casting edges by the same amount, which cancels out of
+// the WIDTH (edge-to-edge difference) — only the rotation angle and module length matter here.
+export function computeShadowFootprintWidthM(
+  rotationDeg: number,
+  moduleLengthM: number,
+  sunDirX: number,
+  sunDirY: number,
+): number {
+  if (sunDirY <= 0) return 0; // sun at or below the horizon: no shadow
+  const rotationRad = rotationDeg * DEG2RAD;
+  const halfLength = moduleLengthM / 2;
+  const edgeX = halfLength * Math.cos(rotationRad);
+  const edgeY = halfLength * Math.sin(rotationRad);
+  // Ground-projected X of a point (px, py) along the sun direction: px - (py/sunDirY)*sunDirX.
+  const shadowX1 = edgeX - (edgeY / sunDirY) * sunDirX;
+  const shadowX2 = -edgeX - (-edgeY / sunDirY) * sunDirX;
+  return Math.abs(shadowX1 - shadowX2);
+}
+
+// "Anti-tracking": instead of facing the sun (computeTrackerRotationDeg), rotate 90deg off
+// that angle — to whichever side (east, i.e. -90, or west, i.e. +90) yields the smaller
+// shadow footprint once clamped to the mechanical limit. A literal 90deg offset usually
+// exceeds maxRotationDeg, so in practice this mostly drives the tracker to one of its two
+// physical end-stops; which one depends on the sun's actual position via
+// computeShadowFootprintWidthM.
+export function computeAntiTrackingRotationDeg(
+  trackingRotationDeg: number,
+  maxRotationDeg: number,
+  moduleLengthM: number,
+  sunDirX: number,
+  sunDirY: number,
+): number {
+  const eastCandidate = clamp(trackingRotationDeg - 90, -maxRotationDeg, maxRotationDeg);
+  const westCandidate = clamp(trackingRotationDeg + 90, -maxRotationDeg, maxRotationDeg);
+  const eastFootprint = computeShadowFootprintWidthM(eastCandidate, moduleLengthM, sunDirX, sunDirY);
+  const westFootprint = computeShadowFootprintWidthM(westCandidate, moduleLengthM, sunDirX, sunDirY);
+  return eastFootprint <= westFootprint ? eastCandidate : westCandidate;
+}
