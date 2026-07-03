@@ -11,11 +11,6 @@ import { createGeometryControl } from "./geometryControl";
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const { scene, camera, renderer, controls, sunLightRig, rows } = createAppScene(app);
 
-const titleEl = document.createElement("div");
-titleEl.className = "app-title";
-titleEl.textContent = "1P Tracker";
-app.appendChild(titleEl);
-
 createGeometryControl(app);
 
 // minutesSinceMidnight is local SOLAR time at the selected site (see sunPosition.ts) —

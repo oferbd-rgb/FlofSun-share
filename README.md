@@ -82,17 +82,23 @@ the file operations npm needs. Work on a real local disk.
   as the row tilts.
 - **`src/scene.ts`** / **`src/sunLight.ts`** — assembles the three.js scene: a light-sky-blue
   background (`sceneCfg.skyColor`), ground (plus a silver east-west reference strip,
-  `shadeLine` in `config.ts`, for gauging tracker shadow position/length at a glance), the
-  shadow-casting `DirectionalLight` positioned along the computed sun vector, a visible sun
-  marker sphere, tracker rows, compass labels (N/E/S/W), and a few static trees (so shadow
-  behavior is visible independent of the moving panels). `scene.ts` rebuilds the tracker rows
-  (disposing the old per-row geometries first) whenever `onGeometryChange` fires.
-- **`src/timeControl.ts`** — the date input + time slider + play/pause UI, plus a 48-segment
+  `shadeLine` in `config.ts`, for gauging tracker shadow position/length at a glance — a
+  half-cylinder with the flat/open side down and the dome up, rather than a flat plane, so it
+  catches highlights from a range of viewing angles instead of only reflecting strongly from
+  directly overhead), the shadow-casting `DirectionalLight` positioned along the computed sun
+  vector, a visible sun marker sphere, tracker rows, compass labels (N/E/S/W), and a few static
+  trees (so shadow behavior is visible independent of the moving panels). `scene.ts` rebuilds
+  the tracker rows (disposing the old per-row geometries first) whenever `onGeometryChange`
+  fires.
+- **`src/timeControl.ts`** — the date input + time slider + play/pause UI, plus a
   tracking/anti-tracking schedule bar directly beneath the slider: one clickable segment per
-  half-hour of the day (00:00-24:00, fixed — independent of the slider's own sunrise/sunset-
-  bounded range and of the calendar date), toggling `appState.ts`'s `trackingSchedule` for that
-  interval. `main.ts`'s render loop looks up the current interval's mode each frame via
-  `getTrackingModeAt`.
+  half-hour, toggling `appState.ts`'s `trackingSchedule` for that interval.
+  `main.ts`'s render loop looks up the current interval's mode each frame via
+  `getTrackingModeAt`. The bar is positioned/sized to exactly match the slider above it — it
+  spans `[bounds.sunriseMinutes, bounds.sunsetMinutes]`, the same as the slider's own min/max
+  (not a fixed 00:00-24:00 range), clipping any half-hour interval that only partially overlaps
+  that range at either end. The underlying schedule storage is still the fixed 48-slot
+  00:00-24:00 clock, though — only the rendering is bounds-relative.
 - **`src/locationPicker.ts`** — the Leaflet world-map panel; click anywhere to relocate, with
   live reverse-geocoding via OpenStreetMap Nominatim (needs internet; falls back to a raw
   lat/lon label if the request fails).
@@ -121,7 +127,7 @@ the file operations npm needs. Work on a real local disk.
   it blindly — it's for the wrong major version.
 
 The demo tracker is configured as a **1P** (one module wide per row, portrait orientation)
-layout — see the on-screen title.
+layout.
 
 ## Known limitations / possible next steps
 

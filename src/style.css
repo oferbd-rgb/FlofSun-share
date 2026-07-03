@@ -106,22 +106,6 @@ canvas {
   color: #d5d8e0;
 }
 
-.app-title {
-  position: fixed;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 6px 18px;
-  background: rgba(20, 24, 32, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 10px;
-  color: #f0f0f0;
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  backdrop-filter: blur(6px);
-}
-
 .geometry-control {
   position: fixed;
   top: 20px;
@@ -164,7 +148,7 @@ canvas {
 }
 
 .tracking-schedule-bar {
-  display: flex;
+  position: relative;
   width: 320px;
   height: 16px;
   margin-top: 6px;
@@ -174,13 +158,12 @@ canvas {
 }
 
 .tracking-schedule-segment {
-  flex: 1 1 0;
+  position: absolute;
+  top: 0;
   height: 100%;
   background: #2a8f8f;
   cursor: pointer;
-}
-
-.tracking-schedule-segment + .tracking-schedule-segment {
+  box-sizing: border-box;
   border-left: 1px solid rgba(0, 0, 0, 0.25);
 }
 
@@ -190,12 +173,4 @@ canvas {
 
 .tracking-schedule-segment.is-anti-tracking {
   background: #b5641f;
-}
-
-.tracking-schedule-legend {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 4px;
-  font-size: 10px;
-  color: #9aa0ac;
 }

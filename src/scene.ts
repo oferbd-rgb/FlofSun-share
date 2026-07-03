@@ -1,5 +1,6 @@
 import {
   Color,
+  CylinderGeometry,
   HemisphereLight,
   Mesh,
   MeshStandardMaterial,
@@ -41,14 +42,20 @@ export function createAppScene(canvasContainer: HTMLElement): AppScene {
   ground.receiveShadow = true;
   scene.add(ground);
 
-  // Silver east-west reference strip, slightly above the ground to avoid z-fighting — a ruler
-  // for gauging tracker shadow position/length at a glance, even in a single still frame.
+  // Silver east-west reference strip — a ruler for gauging tracker shadow position/length at a
+  // glance, even in a single still frame. Half-cylinder (flat/open face down, dome up) rather
+  // than a flat plane so it catches highlights from a range of observation angles instead of
+  // only reflecting strongly from directly overhead.
+  const shadeLineRadius = shadeLineCfg.widthM / 2;
   const shadeLine = new Mesh(
-    new PlaneGeometry(sceneCfg.groundSize, shadeLineCfg.widthM),
-    new MeshStandardMaterial({ color: shadeLineCfg.color, roughness: 0.4, metalness: 0.3 }),
+    // thetaStart=-PI/2, thetaLength=PI sweeps the half of the circle where local X >= 0; after
+    // the Y->X axis rotation below, local X becomes world Y, so this half sits at world Y >= 0
+    // (the dome), leaving the flat open side down at the ground.
+    new CylinderGeometry(shadeLineRadius, shadeLineRadius, sceneCfg.groundSize, 24, 1, true, -Math.PI / 2, Math.PI),
+    new MeshStandardMaterial({ color: shadeLineCfg.color, roughness: 0.3, metalness: 0.5 }),
   );
-  shadeLine.rotation.x = -Math.PI / 2;
-  shadeLine.position.set(0, 0.01, shadeLineCfg.worldZ);
+  shadeLine.rotation.z = Math.PI / 2; // cylinder axis Y -> X (runs east-west)
+  shadeLine.position.set(0, -0.02, shadeLineCfg.worldZ); // embed slightly so the base edge doesn't z-fight the ground
   shadeLine.receiveShadow = true;
   scene.add(shadeLine);
 

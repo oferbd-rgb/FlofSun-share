@@ -2,7 +2,7 @@ import { animation } from "./config";
 import {
   getDate,
   getTrackingSchedule,
-  HALF_HOURS_PER_DAY,
+  minutesToIntervalIndex,
   setDate,
   setTrackingIntervalMode,
   type DateState,
@@ -30,33 +30,58 @@ function parseIsoDate(iso: string): DateState {
   return { year, month, day };
 }
 
-// One clickable segment per half-hour of the day (fixed 00:00-24:00 range, independent of the
-// slider's own sunrise/sunset-bounded range), toggling that interval between tracking and
-// anti-tracking. See appState.ts's trackingSchedule / getTrackingModeAt.
-function createScheduleBar(): HTMLElement {
+interface ScheduleBar {
+  element: HTMLElement;
+  updateBounds(bounds: DaylightBounds): void;
+}
+
+// One clickable segment per half-hour, positioned/sized (via absolute percentage left/width) to
+// line up with the slider directly above it: the bar always spans exactly
+// [bounds.sunriseMinutes, bounds.sunsetMinutes], same as the slider's own min/max, rather than a
+// fixed 00:00-24:00 range. A half-hour interval that only partially overlaps the bounds (at
+// either end) is clipped to show just its overlapping portion, so the bar's edges land exactly
+// under the slider's own left/right ends. The underlying schedule storage is still the fixed
+// 48-slot 00:00-24:00 clock (see appState.ts) — only the rendering here is bounds-relative.
+function createScheduleBar(): ScheduleBar {
   const bar = document.createElement("div");
   bar.className = "tracking-schedule-bar";
 
-  for (let i = 0; i < HALF_HOURS_PER_DAY; i++) {
-    const segment = document.createElement("div");
-    segment.className = "tracking-schedule-segment";
-    const startLabel = formatClock(i * 30);
-    const endLabel = formatClock(i * 30 + 30);
-    const refreshSegment = () => {
-      const isAntiTracking = getTrackingSchedule()[i] === "anti-track";
-      segment.classList.toggle("is-anti-tracking", isAntiTracking);
-      segment.title = `${startLabel}-${endLabel}: ${isAntiTracking ? "anti-tracking" : "tracking"} (click to toggle)`;
-    };
-    segment.addEventListener("click", () => {
-      const current = getTrackingSchedule()[i];
-      setTrackingIntervalMode(i, current === "track" ? "anti-track" : "track");
+  function render(bounds: DaylightBounds): void {
+    bar.replaceChildren();
+    const totalRangeMinutes = bounds.sunsetMinutes - bounds.sunriseMinutes;
+    if (totalRangeMinutes <= 0) return;
+
+    const firstIntervalStart = Math.floor(bounds.sunriseMinutes / 30) * 30;
+    for (let intervalStart = firstIntervalStart; intervalStart < bounds.sunsetMinutes; intervalStart += 30) {
+      const intervalEnd = intervalStart + 30;
+      const clippedStart = Math.max(intervalStart, bounds.sunriseMinutes);
+      const clippedEnd = Math.min(intervalEnd, bounds.sunsetMinutes);
+      if (clippedEnd <= clippedStart) continue;
+
+      const scheduleIndex = minutesToIntervalIndex(intervalStart);
+      const segment = document.createElement("div");
+      segment.className = "tracking-schedule-segment";
+      segment.style.left = `${((clippedStart - bounds.sunriseMinutes) / totalRangeMinutes) * 100}%`;
+      segment.style.width = `${((clippedEnd - clippedStart) / totalRangeMinutes) * 100}%`;
+
+      const startLabel = formatClock(intervalStart);
+      const endLabel = formatClock(intervalEnd);
+      const refreshSegment = () => {
+        const isAntiTracking = getTrackingSchedule()[scheduleIndex] === "anti-track";
+        segment.classList.toggle("is-anti-tracking", isAntiTracking);
+        segment.title = `${startLabel}-${endLabel}: ${isAntiTracking ? "anti-tracking" : "tracking"} (click to toggle)`;
+      };
+      segment.addEventListener("click", () => {
+        const current = getTrackingSchedule()[scheduleIndex];
+        setTrackingIntervalMode(scheduleIndex, current === "track" ? "anti-track" : "track");
+        refreshSegment();
+      });
       refreshSegment();
-    });
-    refreshSegment();
-    bar.appendChild(segment);
+      bar.appendChild(segment);
+    }
   }
 
-  return bar;
+  return { element: bar, updateBounds: render };
 }
 
 export function createTimeControl(container: HTMLElement, initialBounds: DaylightBounds): TimeControl {
@@ -108,10 +133,13 @@ export function createTimeControl(container: HTMLElement, initialBounds: Dayligh
     refreshDisplay();
   });
 
+  const scheduleBar = createScheduleBar();
+  scheduleBar.updateBounds(bounds);
+
   const sliderStack = document.createElement("div");
   sliderStack.className = "time-control-slider-stack";
   sliderStack.appendChild(slider);
-  sliderStack.appendChild(createScheduleBar());
+  sliderStack.appendChild(scheduleBar.element);
 
   panel.appendChild(dateInput);
   panel.appendChild(playButton);
@@ -138,6 +166,7 @@ export function createTimeControl(container: HTMLElement, initialBounds: Dayligh
       bounds = newBounds;
       slider.min = String(bounds.sunriseMinutes);
       slider.max = String(bounds.sunsetMinutes);
+      scheduleBar.updateBounds(bounds);
       if (minutesSinceMidnight < bounds.sunriseMinutes || minutesSinceMidnight > bounds.sunsetMinutes) {
         minutesSinceMidnight = (bounds.sunriseMinutes + bounds.sunsetMinutes) / 2;
       }
