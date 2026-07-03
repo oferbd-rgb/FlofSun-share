@@ -9,8 +9,9 @@ non-obvious decisions (local solar time model, tracker rotation axis, suncalc v2
   README's "Running it" section for why).
 - `npx tsc --noEmit` — type-check.
 - `npm test` — runs the vitest suite covering the pure math modules (`trackerMath.ts`,
-  `sunPosition.ts`). Combine with visually checking the running app (`npm run dev`) for anything
-  touching rendering/UI.
+  `sunPosition.ts`) plus `appState.ts`'s pure helpers (e.g. the tracking-schedule interval
+  math). Combine with visually checking the running app (`npm run dev`) for anything touching
+  rendering/UI.
 - Config lives in one place: `src/config.ts`. Prefer adding a named constant there over
   hardcoding a number in a component file. Note that `config.ts`'s `tracker.moduleLength`,
   `hubHeight`, `rowSpacing`, and `axisAzimuthDeg` are only the *defaults* — the running app reads

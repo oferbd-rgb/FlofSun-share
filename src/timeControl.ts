@@ -1,5 +1,12 @@
 import { animation } from "./config";
-import { getDate, setDate, type DateState } from "./appState";
+import {
+  getDate,
+  getTrackingSchedule,
+  HALF_HOURS_PER_DAY,
+  setDate,
+  setTrackingIntervalMode,
+  type DateState,
+} from "./appState";
 import type { DaylightBounds } from "./sunPosition";
 
 export interface TimeControl {
@@ -21,6 +28,35 @@ function toIsoDate({ year, month, day }: DateState): string {
 function parseIsoDate(iso: string): DateState {
   const [year, month, day] = iso.split("-").map(Number);
   return { year, month, day };
+}
+
+// One clickable segment per half-hour of the day (fixed 00:00-24:00 range, independent of the
+// slider's own sunrise/sunset-bounded range), toggling that interval between tracking and
+// anti-tracking. See appState.ts's trackingSchedule / getTrackingModeAt.
+function createScheduleBar(): HTMLElement {
+  const bar = document.createElement("div");
+  bar.className = "tracking-schedule-bar";
+
+  for (let i = 0; i < HALF_HOURS_PER_DAY; i++) {
+    const segment = document.createElement("div");
+    segment.className = "tracking-schedule-segment";
+    const startLabel = formatClock(i * 30);
+    const endLabel = formatClock(i * 30 + 30);
+    const refreshSegment = () => {
+      const isAntiTracking = getTrackingSchedule()[i] === "anti-track";
+      segment.classList.toggle("is-anti-tracking", isAntiTracking);
+      segment.title = `${startLabel}-${endLabel}: ${isAntiTracking ? "anti-tracking" : "tracking"} (click to toggle)`;
+    };
+    segment.addEventListener("click", () => {
+      const current = getTrackingSchedule()[i];
+      setTrackingIntervalMode(i, current === "track" ? "anti-track" : "track");
+      refreshSegment();
+    });
+    refreshSegment();
+    bar.appendChild(segment);
+  }
+
+  return bar;
 }
 
 export function createTimeControl(container: HTMLElement, initialBounds: DaylightBounds): TimeControl {
@@ -72,9 +108,14 @@ export function createTimeControl(container: HTMLElement, initialBounds: Dayligh
     refreshDisplay();
   });
 
+  const sliderStack = document.createElement("div");
+  sliderStack.className = "time-control-slider-stack";
+  sliderStack.appendChild(slider);
+  sliderStack.appendChild(createScheduleBar());
+
   panel.appendChild(dateInput);
   panel.appendChild(playButton);
-  panel.appendChild(slider);
+  panel.appendChild(sliderStack);
   panel.appendChild(clockReadout);
   panel.appendChild(tzNote);
   container.appendChild(panel);

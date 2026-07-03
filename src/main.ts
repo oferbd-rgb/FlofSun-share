@@ -1,6 +1,6 @@
 import "./style.css";
 import { tracker as trackerCfg } from "./config";
-import { getDate, getLocation, getTrackerGeometry, getTrackingMode, onStateChange } from "./appState";
+import { getDate, getLocation, getTrackerGeometry, getTrackingModeAt, onStateChange } from "./appState";
 import { getDaylightBounds, getSunAngles, localSolarTimeToDate, sunAzElToVector3 } from "./sunPosition";
 import { computeAntiTrackingRotationDeg, computeTrackerRotationDeg } from "./trackerMath";
 import { createAppScene } from "./scene";
@@ -59,7 +59,7 @@ function frame() {
       trackerCfg.maxRotationDeg,
     );
     lastRotationDeg =
-      getTrackingMode() === "track"
+      getTrackingModeAt(timeControl.getMinutesSinceMidnight()) === "track"
         ? trackingRotationDeg
         : computeAntiTrackingRotationDeg(
             trackingRotationDeg,

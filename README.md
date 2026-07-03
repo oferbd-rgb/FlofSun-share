@@ -64,7 +64,7 @@ the file operations npm needs. Work on a real local disk.
     formula for it flipped the default tracking direction. Removed rather than re-derived, to
     keep this formula's correctness easy to verify.
   - `computeShadowFootprintWidthM` / `computeAntiTrackingRotationDeg` — support the
-    Tracking/Anti-tracking toggle in `geometryControl.ts`. Anti-tracking rotates 90deg off the
+    tracking/anti-tracking schedule bar in `timeControl.ts`. Anti-tracking rotates 90deg off the
     sun-facing angle (clamped to `maxRotationDeg`, so in practice it mostly drives to one of the
     two mechanical end-stops) toward whichever side — east or west — casts the smaller shadow,
     per `computeShadowFootprintWidthM`'s east-west shadow-edge projection for that candidate
@@ -87,14 +87,19 @@ the file operations npm needs. Work on a real local disk.
   marker sphere, tracker rows, compass labels (N/E/S/W), and a few static trees (so shadow
   behavior is visible independent of the moving panels). `scene.ts` rebuilds the tracker rows
   (disposing the old per-row geometries first) whenever `onGeometryChange` fires.
-- **`src/timeControl.ts`** — the date input + time slider + play/pause UI.
+- **`src/timeControl.ts`** — the date input + time slider + play/pause UI, plus a 48-segment
+  tracking/anti-tracking schedule bar directly beneath the slider: one clickable segment per
+  half-hour of the day (00:00-24:00, fixed — independent of the slider's own sunrise/sunset-
+  bounded range and of the calendar date), toggling `appState.ts`'s `trackingSchedule` for that
+  interval. `main.ts`'s render loop looks up the current interval's mode each frame via
+  `getTrackingModeAt`.
 - **`src/locationPicker.ts`** — the Leaflet world-map panel; click anywhere to relocate, with
   live reverse-geocoding via OpenStreetMap Nominatim (needs internet; falls back to a raw
   lat/lon label if the request fails).
-- **`src/geometryControl.ts`** — the "Tracker geometry" panel: a Tracking/Anti-tracking mode
-  toggle button, plus number inputs for module length, hub height, row spacing, and axis
-  azimuth, writing straight into `appState.ts`'s tracker geometry state on change. Module width
-  stays a fixed constant in `config.ts` — not exposed here.
+- **`src/geometryControl.ts`** — the "Tracker geometry" panel: number inputs for module length,
+  hub height, row spacing, and axis azimuth, writing straight into `appState.ts`'s tracker
+  geometry state on change. Module width stays a fixed constant in `config.ts` — not exposed
+  here.
 - **`src/groundTexture.ts`** — a small procedural canvas texture (lighter, speckled green,
   tiled via `RepeatWrapping`) used as the ground's `map`, instead of a single flat color.
 - **`src/billboard.ts`** — signs textured with a logo image (`config.ts`'s `billboards.logoUrl`,
