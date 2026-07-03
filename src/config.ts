@@ -22,8 +22,8 @@ export const demoDate = {
 // geometry controls — see appState.ts's TrackerGeometryState, which is what the running app
 // actually reads.
 export const tracker = {
-  rowCount: 3,
-  modulesPerRow: 10,
+  rowCount: 4,
+  modulesPerRow: 15, // ~1.5x the original 10, making each row ~1.5x longer
   // Module width runs ALONG the row's rotation axis (the row-pitch dimension) — fixed, not
   // user-adjustable. This is the "portrait" (1P) mounting: the module's long edge
   // (moduleLength) runs across the axis instead, sweeping toward/away from the sun as the row
@@ -57,15 +57,12 @@ export const animation = {
 
 export const billboards = {
   logoUrl: "/edf-logo.svg",
-  widthM: 9, // "twice the size of a tree" per feedback (trees are ~4-5m tall/wide)
-  heightM: 1.5,
+  widthM: 18, // doubled from 9 per feedback
+  heightM: 3, // doubled from 1.5, keeping the same aspect ratio
   hoverHeightM: 1.5, // gap under the sign so it casts a shadow onto the ground, not touching it
-  // Positions/facing eyeballed from the user's screenshot markup, then moved toward the SE
-  // corner of the ground (groundSize/2 = 30) per feedback — nudge freely.
-  signs: [
-    { worldX: 20, worldZ: 18, facingAzimuthDeg: 180 }, // facing south
-    { worldX: 20, worldZ: 22, facingAzimuthDeg: 0 }, // facing north
-  ],
+  // Positioned toward the SE corner of the ground (groundSize/2 = 30). The north-facing sign
+  // was removed per feedback — just the one, facing south, remains.
+  signs: [{ worldX: 20, worldZ: 18, facingAzimuthDeg: 180 }],
 };
 
 export const sunPath = {
