@@ -63,19 +63,24 @@ the file operations npm needs. Work on a real local disk.
     row group, but combining a yaw with this formula's sign convention without re-deriving the
     formula for it flipped the default tracking direction. Removed rather than re-derived, to
     keep this formula's correctness easy to verify.
-- **`src/tracker.ts`** — builds one tracker row (a pivot `Group` + N modules), always laid out
-  along the world Z axis (N-S) regardless of `axisAzimuthDeg`. The pivot rotates around its
-  local **Z axis** (the torque tube's own centerline) every frame to sweep the modules east-west
-  — rotating around X or Y here would incorrectly shift modules along the row. Modules are
-  mounted **1P (one-in-portrait)**: `moduleWidth` (fixed) runs *along* the axis (the row-pitch
-  dimension) and `moduleLength` (adjustable) runs *across* it — the dimension that actually
-  sweeps toward/away from the sun as the row tilts.
+- **`src/tracker.ts`** — builds one tracker row as two nested groups: an outer `anchorGroup` at
+  ground level, never rotated, holding `tracker.postCount` static ground-to-hub support posts
+  (one at each end of the row, the rest evenly spaced); and an inner `pivotGroup`, translated up
+  to hub height, holding the torque tube + modules. Only `pivotGroup`'s local **Z** rotation
+  (the tube's own centerline) changes per frame to sweep the modules east-west — rotating
+  around X or Y instead would incorrectly shift modules along the row, and rotating the posts
+  along with it would make them (wrongly) swing with the panels. Always laid out along the
+  world Z axis (N-S) regardless of `axisAzimuthDeg`. Modules are mounted **1P (one-in-portrait)**:
+  `moduleWidth` (fixed) runs *along* the axis (the row-pitch dimension) and `moduleLength`
+  (adjustable) runs *across* it — the dimension that actually sweeps toward/away from the sun
+  as the row tilts.
 - **`src/scene.ts`** / **`src/sunLight.ts`** — assembles the three.js scene: a light-sky-blue
-  background (`sceneCfg.skyColor`), ground, the shadow-casting `DirectionalLight` positioned
-  along the computed sun vector, a visible sun marker sphere, tracker rows, compass labels
-  (N/E/S/W), and a few static trees (so shadow behavior is visible independent of the moving
-  panels). `scene.ts` rebuilds the tracker rows (disposing the old per-row geometries first)
-  whenever `onGeometryChange` fires.
+  background (`sceneCfg.skyColor`), ground (plus a silver east-west reference strip,
+  `shadeLine` in `config.ts`, for gauging tracker shadow position/length at a glance), the
+  shadow-casting `DirectionalLight` positioned along the computed sun vector, a visible sun
+  marker sphere, tracker rows, compass labels (N/E/S/W), and a few static trees (so shadow
+  behavior is visible independent of the moving panels). `scene.ts` rebuilds the tracker rows
+  (disposing the old per-row geometries first) whenever `onGeometryChange` fires.
 - **`src/timeControl.ts`** — the date input + time slider + play/pause UI.
 - **`src/locationPicker.ts`** — the Leaflet world-map panel; click anywhere to relocate, with
   live reverse-geocoding via OpenStreetMap Nominatim (needs internet; falls back to a raw

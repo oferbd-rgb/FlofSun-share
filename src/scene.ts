@@ -10,7 +10,7 @@ import {
   WebGLRenderer,
 } from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { billboards as billboardCfg, scene as sceneCfg, tracker as trackerCfg } from "./config";
+import { billboards as billboardCfg, scene as sceneCfg, shadeLine as shadeLineCfg, tracker as trackerCfg } from "./config";
 import { getDate, getLocation, getTrackerGeometry, onGeometryChange, onStateChange } from "./appState";
 import { createBillboard, loadLogoImage } from "./billboard";
 import { addCompassLabels } from "./compassLabels";
@@ -40,6 +40,17 @@ export function createAppScene(canvasContainer: HTMLElement): AppScene {
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   scene.add(ground);
+
+  // Silver east-west reference strip, slightly above the ground to avoid z-fighting — a ruler
+  // for gauging tracker shadow position/length at a glance, even in a single still frame.
+  const shadeLine = new Mesh(
+    new PlaneGeometry(sceneCfg.groundSize, shadeLineCfg.widthM),
+    new MeshStandardMaterial({ color: shadeLineCfg.color, roughness: 0.4, metalness: 0.3 }),
+  );
+  shadeLine.rotation.x = -Math.PI / 2;
+  shadeLine.position.set(0, 0.01, shadeLineCfg.worldZ);
+  shadeLine.receiveShadow = true;
+  scene.add(shadeLine);
 
   scene.add(new HemisphereLight(0xbfd8ff, 0x3a3a2a, 0.6));
   const sunLightRig = createSunLightRig(scene);

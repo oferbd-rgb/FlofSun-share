@@ -34,6 +34,8 @@ export const tracker = {
   moduleGap: 0.05, // gap between adjacent modules along the row axis (m)
   rowSpacing: 7.5, // distance between row (torque tube) centers (m)
   torqueTubeRadius: 0.08, // m
+  postCount: 5, // ground-to-hub support posts per row: one at each end, rest evenly spaced
+  postRadius: 0.1, // m — static, do not rotate with the pivot (see tracker.ts)
   // Compass bearing of the tracker axis (0=N, 90=E, 180=S, 270=W — same convention as solar
   // azimuth in sunPosition.ts), fed into computeTrackerRotationDeg. Rows are always physically
   // laid out along the N-S line (see tracker.ts/scene.ts) — this only changes the *tracking
@@ -68,4 +70,13 @@ export const billboards = {
 export const sunPath = {
   color: 0xffdd33,
   sampleCount: 144, // every 10 minutes across 24h
+};
+
+// A reference strip across the ground, running east-west (perpendicular to the N-S tracker
+// rows) so the shadow they cast sweeps across it — a visual ruler for gauging shadow position
+// even in a single still frame.
+export const shadeLine = {
+  color: 0xc0c0c0, // silver
+  widthM: 1, // north-south width of the strip
+  worldZ: 0, // crosses through the tracker field's center
 };
