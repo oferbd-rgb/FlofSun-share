@@ -168,13 +168,21 @@ the file operations npm needs. Work on a real local disk.
   shadow interval (`trackerMath.ts`'s `computeRowShadowIntervalX`, which — unlike
   `computeShadowFootprintWidthM` — keeps hub height and row position rather than only measuring
   shadow *width*, so it can place the shadow in absolute ground coordinates).
-- **`src/sunHoursReport.ts`** — builds the report itself as a full-screen overlay (not a real
-  navigation — just a DOM element toggled in front of the 3D view, wired up in `main.ts`): a
-  fixed-data summary (coordinates, date, tracker geometry, collapsed anti-tracking windows), a
-  schematic top-down SVG plan of the row layout (north half of each row only, per feedback), and
-  a canvas-rendered binary grey/green heatmap (`computeShadeMatrix`'s output) — X = ground
-  east-west position, Y = time of day, grey covers both "shaded by a row" and "night" (a
-  genuinely binary sunlit/not-sunlit distinction, as requested, not a 3-color one).
+- **`src/sunHoursReport.ts`** — no longer a separate full-screen page. `createSunHoursPanel`
+  builds a small overlay panel (fixed-data summary line + a canvas-rendered binary grey/green
+  heatmap from `computeShadeMatrix` — X = ground east-west position, Y = time of day, grey covers
+  both "shaded by a row" and "night") that sits alongside the *live* 3D scene rather than hiding
+  it. The "top view" is the real scene itself, not a schematic drawing: `main.ts`'s
+  `enterReportMode`/`exitReportMode` switch the existing camera to a fixed, still, straight-down
+  angle (disabling `OrbitControls` for the duration) and hide only the momentary/time-of-day
+  panels (`.time-control`, `.readings-panel`) — the geometry-control and location-picker panels
+  stay visible and live. `sunHoursPanel.refresh()` is re-invoked on `onGeometryChange`/
+  `onStateChange` while the report is open, so editing geometry or location visibly updates both
+  the 3D row layout (already reactive, via `scene.ts`'s `rebuildRows`) and the heatmap together.
+  The top-down camera offsets by a tiny amount on the Z axis only (not X and Z) before letting
+  `OrbitControls` re-derive its spherical coordinates from the new position — an equal X/Z offset
+  would instead put the camera on a 45deg diagonal, rendering the square ground as a rotated
+  diamond instead of a clean axis-aligned top-down rectangle.
 
 The demo tracker is configured as a **1P** (one module wide per row, portrait orientation)
 layout.

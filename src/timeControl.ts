@@ -10,9 +10,11 @@ import {
 import type { DaylightBounds } from "./sunPosition";
 
 export interface TimeControl {
+  element: HTMLElement;
   getMinutesSinceMidnight(): number;
   advance(realDeltaSeconds: number): void;
   updateBounds(bounds: DaylightBounds): void;
+  pause(): void;
 }
 
 function formatClock(minutes: number): string {
@@ -169,8 +171,13 @@ export function createTimeControl(container: HTMLElement, initialBounds: Dayligh
   refreshDisplay();
 
   return {
+    element: panel,
     getMinutesSinceMidnight() {
       return minutesSinceMidnight;
+    },
+    pause() {
+      playing = false;
+      playButton.textContent = "Play";
     },
     advance(realDeltaSeconds: number) {
       if (!playing) return;

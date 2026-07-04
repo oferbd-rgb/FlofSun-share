@@ -268,60 +268,43 @@ canvas {
   border-color: var(--accent);
 }
 
-.sun-hours-report {
+.sun-hours-panel {
   position: fixed;
-  inset: 0;
-  z-index: 100;
-  overflow-y: auto;
-  background: #10141a;
-  color: var(--text-primary);
-  padding: 24px 32px 48px;
-}
-
-.sun-hours-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-
-.sun-hours-title {
-  font-size: 22px;
-  font-weight: 600;
-}
-
-.sun-hours-back-button {
-  padding: 8px 16px;
-  border-radius: 8px;
-  border: 1px solid var(--panel-border);
-  background: #2a3040;
-  color: var(--text-primary);
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.sun-hours-back-button:hover {
-  border-color: var(--accent);
-}
-
-.sun-hours-summary {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 8px 24px;
-  padding: 16px 20px;
-  margin-bottom: 24px;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  max-width: 640px;
+  padding: 14px 18px;
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   border-radius: var(--panel-radius);
   box-shadow: var(--panel-shadow);
+  color: var(--text-primary);
+  backdrop-filter: blur(10px);
+}
+
+.sun-hours-panel-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.sun-hours-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  margin-bottom: 10px;
 }
 
 .sun-hours-summary-row {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 13px;
+  gap: 6px;
+  font-size: 12px;
 }
 
 .sun-hours-summary-label {
@@ -330,32 +313,6 @@ canvas {
 
 .sun-hours-summary-value {
   font-family: var(--mono-font);
-  text-align: right;
-}
-
-.sun-hours-section {
-  margin-bottom: 24px;
-  padding: 16px 20px;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: var(--panel-radius);
-  box-shadow: var(--panel-shadow);
-}
-
-.sun-hours-section-label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--accent);
-  padding-bottom: 8px;
-  margin-bottom: 12px;
-  border-bottom: 1px solid var(--panel-border);
-}
-
-.sun-hours-topview-svg {
-  display: block;
-  border-radius: 6px;
 }
 
 .sun-hours-heatmap-wrap {

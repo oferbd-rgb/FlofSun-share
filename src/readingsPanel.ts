@@ -1,4 +1,5 @@
 export interface ReadingsPanel {
+  element: HTMLElement;
   update(sunAzimuthDeg: number, sunAltitudeDeg: number, solarAngleDeg: number, trackerAngleDeg: number): void;
 }
 
@@ -45,6 +46,7 @@ export function createReadingsPanel(container: HTMLElement): ReadingsPanel {
   container.appendChild(panel);
 
   return {
+    element: panel,
     update(sunAzimuthDeg, sunAltitudeDeg, solarAngleDeg, trackerAngleDeg) {
       azimuthValue.textContent = `Az ${sunAzimuthDeg.toFixed(1)} deg`;
       altitudeValue.textContent = `Alt ${sunAltitudeDeg.toFixed(1)} deg`;

@@ -1,6 +1,6 @@
 import "./style.css";
-import { tracker as trackerCfg } from "./config";
-import { getDate, getLocation, getTrackerGeometry, getTrackingModeAt, onStateChange } from "./appState";
+import { scene as sceneCfg, tracker as trackerCfg } from "./config";
+import { getDate, getLocation, getTrackerGeometry, getTrackingModeAt, onGeometryChange, onStateChange } from "./appState";
 import { getDaylightBounds, getSunAngles, localSolarTimeToDate, sunAzElToVector3 } from "./sunPosition";
 import {
   computeAntiTrackingRotationDeg,
@@ -13,27 +13,13 @@ import { createTimeControl } from "./timeControl";
 import { createLocationPicker } from "./locationPicker";
 import { createGeometryControl } from "./geometryControl";
 import { createReadingsPanel } from "./readingsPanel";
-import { createSunHoursReport } from "./sunHoursReport";
+import { createSunHoursPanel, type SunHoursPanel } from "./sunHoursReport";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const { scene, camera, renderer, controls, sunLightRig, rows } = createAppScene(app);
 
 createGeometryControl(app);
 const readingsPanel = createReadingsPanel(app);
-
-const sunHoursButton = document.createElement("button");
-sunHoursButton.className = "sun-hours-trigger-button";
-sunHoursButton.textContent = "Cumulative sunhours";
-app.appendChild(sunHoursButton);
-
-let reportElement: HTMLElement | null = null;
-sunHoursButton.addEventListener("click", () => {
-  reportElement = createSunHoursReport(() => {
-    reportElement?.remove();
-    reportElement = null;
-  });
-  app.appendChild(reportElement);
-});
 
 // minutesSinceMidnight is local SOLAR time at the selected site (see sunPosition.ts) —
 // not the browser's system timezone.
@@ -50,6 +36,74 @@ onStateChange(() => {
   const loc = getLocation();
   const newBounds = getDaylightBounds(getDate(), loc.latitude, loc.longitude);
   timeControl.updateBounds(newBounds);
+});
+
+// --- Cumulative Sun Hours "report": rather than a separate page, this switches the live scene
+// to a still top-down view and hides only the momentary/time-of-day panels (time control,
+// readings), which don't apply to a full-day summary. Geometry control and the location picker
+// stay live so their effect on both the 3D layout and the heatmap is visible immediately.
+const sunHoursButton = document.createElement("button");
+sunHoursButton.className = "sun-hours-trigger-button";
+sunHoursButton.textContent = "Cumulative sunhours";
+app.appendChild(sunHoursButton);
+
+const savedCameraPosition = camera.position.clone();
+const savedControlsTarget = controls.target.clone();
+
+let reportActive = false;
+let sunHoursPanel: SunHoursPanel | null = null;
+
+function enterReportMode(): void {
+  reportActive = true;
+  timeControl.pause();
+  timeControl.element.style.display = "none";
+  readingsPanel.element.style.display = "none";
+
+  savedCameraPosition.copy(camera.position);
+  savedControlsTarget.copy(controls.target);
+  // A tiny Z-only offset (not X and Z both) avoids the vertical-look singularity in OrbitControls'
+  // internal spherical coordinates while keeping the view axis-aligned with the row layout (rows
+  // run along world Z) — an equal X/Z offset would instead put the camera on a 45deg diagonal,
+  // rendering the square ground as a rotated diamond instead of a clean top-down rectangle.
+  camera.position.set(0, sceneCfg.groundSize * 1.4, 0.01);
+  controls.target.set(0, 0, 0);
+  controls.enabled = false; // "still" top view — no orbit/zoom/pan while the report is open
+
+  sunHoursButton.textContent = "Back to 3D model";
+  sunHoursPanel = createSunHoursPanel();
+  app.appendChild(sunHoursPanel.element);
+}
+
+function exitReportMode(): void {
+  reportActive = false;
+  timeControl.element.style.display = "";
+  readingsPanel.element.style.display = "";
+
+  camera.position.copy(savedCameraPosition);
+  controls.target.copy(savedControlsTarget);
+  controls.enabled = true;
+
+  sunHoursButton.textContent = "Cumulative sunhours";
+  sunHoursPanel?.element.remove();
+  sunHoursPanel = null;
+}
+
+sunHoursButton.addEventListener("click", () => {
+  if (reportActive) {
+    exitReportMode();
+  } else {
+    enterReportMode();
+  }
+});
+
+// Geometry changes already trigger scene.ts's rebuildRows (so the top-down 3D view updates on
+// its own) — this just keeps the heatmap matrix in sync while the report panel is open. Location
+// changes matter too (shading depends on lat/lng), so both trigger a refresh.
+onGeometryChange(() => {
+  if (reportActive) sunHoursPanel?.refresh();
+});
+onStateChange(() => {
+  if (reportActive) sunHoursPanel?.refresh();
 });
 
 let lastFrameTime = performance.now();
