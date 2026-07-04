@@ -15,6 +15,11 @@ export interface TimeControl {
   advance(realDeltaSeconds: number): void;
   updateBounds(bounds: DaylightBounds): void;
   pause(): void;
+  // Hides the momentary/instantaneous controls (play, speed, scrub slider, clock) while keeping
+  // the date input and the tracking/anti-tracking schedule bar visible — used while the
+  // Cumulative Sun Hours report is open, since a full-day report has no "current moment" but
+  // still depends on which date and which schedule are in effect.
+  setCompact(compact: boolean): void;
 }
 
 function formatClock(minutes: number): string {
@@ -178,6 +183,14 @@ export function createTimeControl(container: HTMLElement, initialBounds: Dayligh
     pause() {
       playing = false;
       playButton.textContent = "Play";
+    },
+    setCompact(compact: boolean) {
+      const hiddenDisplay = compact ? "none" : "";
+      playButton.style.display = hiddenDisplay;
+      speedSelect.style.display = hiddenDisplay;
+      slider.style.display = hiddenDisplay;
+      clockReadout.style.display = hiddenDisplay;
+      tzNote.style.display = hiddenDisplay;
     },
     advance(realDeltaSeconds: number) {
       if (!playing) return;

@@ -169,20 +169,30 @@ the file operations npm needs. Work on a real local disk.
   `computeShadowFootprintWidthM` — keeps hub height and row position rather than only measuring
   shadow *width*, so it can place the shadow in absolute ground coordinates).
 - **`src/sunHoursReport.ts`** — no longer a separate full-screen page. `createSunHoursPanel`
-  builds a small overlay panel (fixed-data summary line + a canvas-rendered binary grey/green
-  heatmap from `computeShadeMatrix` — X = ground east-west position, Y = time of day, grey covers
-  both "shaded by a row" and "night") that sits alongside the *live* 3D scene rather than hiding
-  it. The "top view" is the real scene itself, not a schematic drawing: `main.ts`'s
-  `enterReportMode`/`exitReportMode` switch the existing camera to a fixed, still, straight-down
-  angle (disabling `OrbitControls` for the duration) and hide only the momentary/time-of-day
-  panels (`.time-control`, `.readings-panel`) — the geometry-control and location-picker panels
-  stay visible and live. `sunHoursPanel.refresh()` is re-invoked on `onGeometryChange`/
-  `onStateChange` while the report is open, so editing geometry or location visibly updates both
-  the 3D row layout (already reactive, via `scene.ts`'s `rebuildRows`) and the heatmap together.
-  The top-down camera offsets by a tiny amount on the Z axis only (not X and Z) before letting
-  `OrbitControls` re-derive its spherical coordinates from the new position — an equal X/Z offset
-  would instead put the camera on a 45deg diagonal, rendering the square ground as a rotated
-  diamond instead of a clean axis-aligned top-down rectangle.
+  builds a small overlay panel that sits alongside the *live* 3D scene rather than hiding it,
+  kept deliberately short (1px-tall heatmap rows, trimmed padding) so the top-down 3D view stays
+  visible above it. It has no fixed-data text summary — date and the tracking/anti-tracking
+  schedule are shown live by the (trimmed) time-control bar instead, see below. Contents: a
+  canvas-rendered binary grey/green heatmap from `computeShadeMatrix` (X = ground east-west
+  position, Y = time of day, grey covers both "shaded by a row" and "night"), a dual-handle hour
+  range slider (two overlaid native `<input type="range">`s, thumbs-only via
+  `pointer-events`/`::-webkit-slider-thumb` — a standard lightweight pattern, no library), and a
+  filled line-chart graph below the matrix showing cumulative sun-hours per x-position summed
+  over exactly the selected hour range (`computeSunHoursByX`). The "top view" above it is the
+  real scene itself, not a schematic drawing: `main.ts`'s `enterReportMode`/`exitReportMode`
+  switch the existing camera to a fixed, still, straight-down angle (disabling `OrbitControls`
+  for the duration) and hide only the momentary/instantaneous controls — the readings panel
+  entirely, and (via `timeControl.ts`'s `setCompact`) just the play button, speed select, scrub
+  slider, and clock from the time-control bar, leaving its date input and schedule bar in place.
+  Geometry-control and location-picker stay visible and live throughout.
+  `sunHoursPanel.refresh()` is re-invoked on `onGeometryChange`/`onStateChange` while the report
+  is open, so editing geometry or location visibly updates both the 3D row layout (already
+  reactive, via `scene.ts`'s `rebuildRows`) and the heatmap+graph together; dragging the hour
+  range slider only needs to redraw the graph, not recompute the underlying matrix. The top-down
+  camera offsets by a tiny amount on the Z axis only (not X and Z) before letting `OrbitControls`
+  re-derive its spherical coordinates from the new position — an equal X/Z offset would instead
+  put the camera on a 45deg diagonal, rendering the square ground as a rotated diamond instead of
+  a clean axis-aligned top-down rectangle.
 
 The demo tracker is configured as a **1P** (one module wide per row, portrait orientation)
 layout.

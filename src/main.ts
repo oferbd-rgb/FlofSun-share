@@ -56,7 +56,7 @@ let sunHoursPanel: SunHoursPanel | null = null;
 function enterReportMode(): void {
   reportActive = true;
   timeControl.pause();
-  timeControl.element.style.display = "none";
+  timeControl.setCompact(true);
   readingsPanel.element.style.display = "none";
 
   savedCameraPosition.copy(camera.position);
@@ -76,7 +76,7 @@ function enterReportMode(): void {
 
 function exitReportMode(): void {
   reportActive = false;
-  timeControl.element.style.display = "";
+  timeControl.setCompact(false);
   readingsPanel.element.style.display = "";
 
   camera.position.copy(savedCameraPosition);

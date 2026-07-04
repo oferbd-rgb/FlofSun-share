@@ -274,7 +274,7 @@ canvas {
   bottom: 24px;
   transform: translateX(-50%);
   max-width: 640px;
-  padding: 14px 18px;
+  padding: 10px 18px;
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   border-radius: var(--panel-radius);
@@ -284,35 +284,79 @@ canvas {
 }
 
 .sun-hours-panel-title {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--accent);
-  padding-bottom: 8px;
-  margin-bottom: 10px;
+  padding-bottom: 4px;
+  margin-bottom: 6px;
   border-bottom: 1px solid var(--panel-border);
 }
 
-.sun-hours-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 20px;
-  margin-bottom: 10px;
+.sun-hours-range {
+  position: relative;
+  height: 16px;
+  margin: 4px 0 2px 42px; /* left margin lines it up with the heatmap canvas, past the y-axis gutter */
 }
 
-.sun-hours-summary-row {
-  display: flex;
-  gap: 6px;
-  font-size: 12px;
+.sun-hours-range input[type="range"] {
+  position: absolute;
+  top: 3px;
+  left: 0;
+  width: 100%;
+  margin: 0;
+  background: none;
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
-.sun-hours-summary-label {
-  color: var(--text-muted);
+.sun-hours-range input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
 }
 
-.sun-hours-summary-value {
+.sun-hours-range input[type="range"]::-webkit-slider-thumb {
+  pointer-events: auto;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  margin-top: -5px;
+}
+
+.sun-hours-range input[type="range"]::-moz-range-track {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+}
+
+.sun-hours-range input[type="range"]::-moz-range-thumb {
+  pointer-events: auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: none;
+}
+
+.sun-hours-range-label {
+  font-size: 11px;
   font-family: var(--mono-font);
+  color: var(--text-muted);
+  margin: 0 0 6px 42px;
+}
+
+.sun-hours-graph-canvas {
+  display: block;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.2);
 }
 
 .sun-hours-heatmap-wrap {
@@ -337,7 +381,7 @@ canvas {
 
 .sun-hours-heatmap-canvas-wrap {
   position: relative;
-  padding-bottom: 20px;
+  padding-bottom: 16px;
 }
 
 .sun-hours-heatmap-canvas {
@@ -347,12 +391,12 @@ canvas {
 
 .sun-hours-axis-x {
   position: relative;
-  height: 20px;
+  height: 16px;
 }
 
 .sun-hours-axis-x span {
   position: absolute;
-  top: 4px;
+  top: 2px;
   transform: translateX(-50%);
   font-size: 11px;
   font-family: var(--mono-font);
@@ -363,7 +407,7 @@ canvas {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 12px;
+  margin: 6px 0;
   font-size: 12px;
   color: var(--text-muted);
 }
