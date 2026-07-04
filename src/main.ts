@@ -13,12 +13,27 @@ import { createTimeControl } from "./timeControl";
 import { createLocationPicker } from "./locationPicker";
 import { createGeometryControl } from "./geometryControl";
 import { createReadingsPanel } from "./readingsPanel";
+import { createSunHoursReport } from "./sunHoursReport";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const { scene, camera, renderer, controls, sunLightRig, rows } = createAppScene(app);
 
 createGeometryControl(app);
 const readingsPanel = createReadingsPanel(app);
+
+const sunHoursButton = document.createElement("button");
+sunHoursButton.className = "sun-hours-trigger-button";
+sunHoursButton.textContent = "Cumulative sunhours";
+app.appendChild(sunHoursButton);
+
+let reportElement: HTMLElement | null = null;
+sunHoursButton.addEventListener("click", () => {
+  reportElement = createSunHoursReport(() => {
+    reportElement?.remove();
+    reportElement = null;
+  });
+  app.appendChild(reportElement);
+});
 
 // minutesSinceMidnight is local SOLAR time at the selected site (see sunPosition.ts) —
 // not the browser's system timezone.

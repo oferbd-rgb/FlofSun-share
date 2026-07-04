@@ -158,6 +158,23 @@ the file operations npm needs. Work on a real local disk.
   reflects suncalc's old v1.x API (radians, azimuth from south); suncalc v2.x is a breaking
   rewrite (degrees, azimuth clockwise from north). Don't `npm install @types/suncalc` and trust
   it blindly — it's for the wrong major version.
+- **`src/shadeAnalysis.ts`** — pure (no three.js — recomputes the sun direction's X/Y components
+  inline rather than importing `sunAzElToVector3`, same reasoning as `trackerMath.ts`),
+  independently testable: `computeShadeMatrix` builds the "Cumulative sunhours" report's
+  ground-shading heatmap by sampling the day at a fixed interval and, for each sample, using the
+  *deterministic* tracking/anti-tracking angle (same formulas as `main.ts`'s render loop, but
+  **not** the live rate-limited rotation — the report describes a fixed, reproducible outcome
+  for the current settings, not a snapshot of in-progress animation) to compute each row's ground
+  shadow interval (`trackerMath.ts`'s `computeRowShadowIntervalX`, which — unlike
+  `computeShadowFootprintWidthM` — keeps hub height and row position rather than only measuring
+  shadow *width*, so it can place the shadow in absolute ground coordinates).
+- **`src/sunHoursReport.ts`** — builds the report itself as a full-screen overlay (not a real
+  navigation — just a DOM element toggled in front of the 3D view, wired up in `main.ts`): a
+  fixed-data summary (coordinates, date, tracker geometry, collapsed anti-tracking windows), a
+  schematic top-down SVG plan of the row layout (north half of each row only, per feedback), and
+  a canvas-rendered binary grey/green heatmap (`computeShadeMatrix`'s output) — X = ground
+  east-west position, Y = time of day, grey covers both "shaded by a row" and "night" (a
+  genuinely binary sunlit/not-sunlit distinction, as requested, not a 3-color one).
 
 The demo tracker is configured as a **1P** (one module wide per row, portrait orientation)
 layout.

@@ -247,3 +247,188 @@ canvas {
   color: var(--text-primary);
   white-space: nowrap;
 }
+
+.sun-hours-trigger-button {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 10px 16px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  box-shadow: var(--panel-shadow);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+}
+
+.sun-hours-trigger-button:hover {
+  border-color: var(--accent);
+}
+
+.sun-hours-report {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  overflow-y: auto;
+  background: #10141a;
+  color: var(--text-primary);
+  padding: 24px 32px 48px;
+}
+
+.sun-hours-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.sun-hours-title {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.sun-hours-back-button {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--panel-border);
+  background: #2a3040;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sun-hours-back-button:hover {
+  border-color: var(--accent);
+}
+
+.sun-hours-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 8px 24px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  box-shadow: var(--panel-shadow);
+}
+
+.sun-hours-summary-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.sun-hours-summary-label {
+  color: var(--text-muted);
+}
+
+.sun-hours-summary-value {
+  font-family: var(--mono-font);
+  text-align: right;
+}
+
+.sun-hours-section {
+  margin-bottom: 24px;
+  padding: 16px 20px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  box-shadow: var(--panel-shadow);
+}
+
+.sun-hours-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.sun-hours-topview-svg {
+  display: block;
+  border-radius: 6px;
+}
+
+.sun-hours-heatmap-wrap {
+  display: flex;
+  gap: 4px;
+}
+
+.sun-hours-axis-y {
+  position: relative;
+  width: 42px;
+  flex-shrink: 0;
+}
+
+.sun-hours-axis-y span {
+  position: absolute;
+  left: 0;
+  transform: translateY(-50%);
+  font-size: 11px;
+  font-family: var(--mono-font);
+  color: var(--text-muted);
+}
+
+.sun-hours-heatmap-canvas-wrap {
+  position: relative;
+  padding-bottom: 20px;
+}
+
+.sun-hours-heatmap-canvas {
+  display: block;
+  border-radius: 4px;
+}
+
+.sun-hours-axis-x {
+  position: relative;
+  height: 20px;
+}
+
+.sun-hours-axis-x span {
+  position: absolute;
+  top: 4px;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-family: var(--mono-font);
+  color: var(--text-muted);
+}
+
+.sun-hours-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.sun-hours-legend-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  margin-left: 12px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.sun-hours-legend-swatch:first-child {
+  margin-left: 0;
+}
+
+.sun-hours-legend-green {
+  background: #3ba55c;
+}
+
+.sun-hours-legend-grey {
+  background: #6b7280;
+}

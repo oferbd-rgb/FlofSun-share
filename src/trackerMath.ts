@@ -80,6 +80,40 @@ export function computeShadowFootprintWidthM(
   return Math.abs(shadowX1 - shadowX2);
 }
 
+// Ground X-interval (absolute world coordinates, not just width) shaded by one panel, given its
+// rotation, hub height, and world X position, projected along the sun direction. Unlike
+// computeShadowFootprintWidthM, this does NOT ignore hub height or row position — it needs both
+// to place the shadow on the ground, not just measure its width. Returns null if the sun is at
+// or below the horizon (no shadow).
+export interface ShadowInterval {
+  startX: number;
+  endX: number;
+}
+
+export function computeRowShadowIntervalX(
+  rotationDeg: number,
+  moduleLengthM: number,
+  hubHeightM: number,
+  rowWorldX: number,
+  sunDirX: number,
+  sunDirY: number,
+): ShadowInterval | null {
+  if (sunDirY <= 0) return null;
+  const rotationRad = rotationDeg * DEG2RAD;
+  const halfLength = moduleLengthM / 2;
+  const edgeX = halfLength * Math.cos(rotationRad);
+  const edgeY = halfLength * Math.sin(rotationRad);
+  // World position of each panel edge (hub position + the tilted local offset).
+  const world1X = rowWorldX + edgeX;
+  const world1Y = hubHeightM + edgeY;
+  const world2X = rowWorldX - edgeX;
+  const world2Y = hubHeightM - edgeY;
+  // Ground-projected X of a point (px, py) along the sun direction: px - (py/sunDirY)*sunDirX.
+  const shadowX1 = world1X - (world1Y / sunDirY) * sunDirX;
+  const shadowX2 = world2X - (world2Y / sunDirY) * sunDirX;
+  return { startX: Math.min(shadowX1, shadowX2), endX: Math.max(shadowX1, shadowX2) };
+}
+
 // "Anti-tracking": instead of facing the sun (computeTrackerRotationDeg), rotate 90deg off
 // that angle — to whichever side (east, i.e. -90, or west, i.e. +90) yields the smaller
 // shadow footprint once clamped to the mechanical limit. A literal 90deg offset usually

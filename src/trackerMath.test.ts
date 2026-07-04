@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   computeAntiTrackingRotationDeg,
+  computeRowShadowIntervalX,
   computeShadowFootprintWidthM,
   computeSolarAngleDeg,
   computeTrackerRotationDeg,
@@ -79,6 +80,35 @@ describe("computeShadowFootprintWidthM", () => {
     const edgeOn = computeShadowFootprintWidthM(45, 2, 1, 1);
     const facing = computeShadowFootprintWidthM(-45, 2, 1, 1);
     expect(facing).toBeGreaterThan(edgeOn);
+  });
+});
+
+describe("computeRowShadowIntervalX", () => {
+  it("returns null when the sun is at or below the horizon", () => {
+    expect(computeRowShadowIntervalX(0, 2, 3, 0, 1, 0)).toBeNull();
+    expect(computeRowShadowIntervalX(0, 2, 3, 0, 1, -0.2)).toBeNull();
+  });
+
+  it("centers directly under the row for a flat panel with the sun straight overhead", () => {
+    const interval = computeRowShadowIntervalX(0, 2, 3, 10, 0, 1)!;
+    expect(interval.startX).toBeCloseTo(9);
+    expect(interval.endX).toBeCloseTo(11);
+  });
+
+  it("translates by exactly the row's world X offset, all else equal", () => {
+    const at0 = computeRowShadowIntervalX(20, 2.5, 3, 0, 0.6, 0.6)!;
+    const at10 = computeRowShadowIntervalX(20, 2.5, 3, 10, 0.6, 0.6)!;
+    expect(at10.startX).toBeCloseTo(at0.startX + 10);
+    expect(at10.endX).toBeCloseTo(at0.endX + 10);
+  });
+
+  it("shifts the shadow away from the sun's direction as hub height increases, without changing its width", () => {
+    const low = computeRowShadowIntervalX(20, 2.5, 1, 0, 0.7, 0.3)!;
+    const high = computeRowShadowIntervalX(20, 2.5, 6, 0, 0.7, 0.3)!;
+    // Sun to the east (positive sunDirX) casts the shadow to the west (more negative X) the
+    // higher off the ground the panel is.
+    expect(high.startX).toBeLessThan(low.startX);
+    expect(high.endX - high.startX).toBeCloseTo(low.endX - low.startX);
   });
 });
 
