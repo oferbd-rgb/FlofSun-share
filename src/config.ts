@@ -56,7 +56,11 @@ export const tracker = {
 export const scene = {
   groundSize: 60, // m, square ground plane
   skyColor: 0xaee2fb, // light sky blue — three.js Scene background
-  sunMarkerDistance: 40, // groundSize/2 + 10 — radius for both the sun marker and the sun-path ring
+  // Radius for both the sun marker and the sun-path ring — doubled per feedback to make the
+  // ring appear farther away. Purely visual: the shadow-casting DirectionalLight in
+  // sunLight.ts uses its own fixed SUN_DISTANCE, driven by the same direction *vector*, so
+  // this has no effect on shadow direction/length.
+  sunMarkerDistance: 80,
 };
 
 export const animation = {
