@@ -105,7 +105,7 @@ export function createTimeControl(container: HTMLElement, initialBounds: Dayligh
   playButton.textContent = "Play";
 
   // Speed multiple of the 1x base rate (animation.simMinutesPerRealSecond = 1 simulated hour
-  // per real second) — rounded, easy-to-reason-about options rather than a continuous slider.
+  // per 2 real seconds) — rounded, easy-to-reason-about options rather than a continuous slider.
   let speedMultiplier = animation.defaultSpeedMultiplier;
   const speedSelect = document.createElement("select");
   speedSelect.className = "speed-select";
@@ -116,7 +116,7 @@ export function createTimeControl(container: HTMLElement, initialBounds: Dayligh
     speedSelect.appendChild(optionEl);
   }
   speedSelect.value = String(speedMultiplier);
-  speedSelect.title = "Playback speed (1x = 1 simulated hour per real second)";
+  speedSelect.title = "Playback speed (1x = 1 simulated hour per 2 real seconds)";
   speedSelect.addEventListener("change", () => {
     speedMultiplier = Number(speedSelect.value);
   });

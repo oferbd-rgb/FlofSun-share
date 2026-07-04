@@ -82,7 +82,7 @@ canvas {
 .clock-readout {
   min-width: 3.5em;
   font-variant-numeric: tabular-nums;
-  font-size: 15px;
+  font-size: 30px;
 }
 
 .tz-note {
