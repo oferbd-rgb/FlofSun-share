@@ -2,9 +2,24 @@ import { describe, expect, it } from "vitest";
 import {
   computeAntiTrackingRotationDeg,
   computeShadowFootprintWidthM,
+  computeSolarAngleDeg,
   computeTrackerRotationDeg,
   stepTowardDeg,
 } from "./trackerMath";
+
+describe("computeSolarAngleDeg", () => {
+  it("is not clamped to any tracker mechanical limit, unlike computeTrackerRotationDeg", () => {
+    // Low morning sun implies an ideal angle well past a typical 60deg tracker limit.
+    const solarAngle = computeSolarAngleDeg(90, 2, 0);
+    expect(Math.abs(solarAngle)).toBeGreaterThan(60);
+    // The clamped tracker angle for the same inputs stays within the limit.
+    expect(computeTrackerRotationDeg(90, 2, 0, 60)).toBeCloseTo(-60);
+  });
+
+  it("agrees with computeTrackerRotationDeg whenever the ideal angle is within the limit", () => {
+    expect(computeSolarAngleDeg(90, 30, 0)).toBeCloseTo(computeTrackerRotationDeg(90, 30, 0, 60));
+  });
+});
 
 describe("computeTrackerRotationDeg", () => {
   it("returns 0 when the sun is exactly along the axis bearing, at any elevation", () => {

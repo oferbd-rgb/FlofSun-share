@@ -25,7 +25,23 @@ function clamp(value: number, min: number, max: number): number {
 // morning (facing east) and positive in the afternoon (facing west).
 //
 // atan2 (not atan) handles the sign/quadrant correctly across the whole day and avoids
-// blowing up as tan(elevation) -> infinity near zenith.
+// blowing up as tan(elevation) -> infinity near zenith. This is a property of the SUN, not the
+// tracker — unclamped, so it can (and near sunrise/sunset, will) exceed a real tracker's
+// mechanical range. Use computeTrackerRotationDeg for the clamped angle actually applied to
+// the hardware; use this one for reporting/comparison (e.g. the "Solar angle" reading).
+export function computeSolarAngleDeg(
+  solarAzimuthDeg: number,
+  solarElevationDeg: number,
+  axisAzimuthDeg: number,
+): number {
+  const deltaAzRad = (axisAzimuthDeg - solarAzimuthDeg) * DEG2RAD;
+  const elevationRad = solarElevationDeg * DEG2RAD;
+  const rotationRad = Math.atan2(Math.sin(deltaAzRad), Math.tan(elevationRad));
+  return rotationRad * RAD2DEG;
+}
+
+// Same as computeSolarAngleDeg, clamped to the tracker's mechanical rotation limit — this is
+// what actually gets applied to the hardware/rendered rows.
 //
 // When the sun is below the horizon, the tracker holds its last angle rather than being
 // driven by a meaningless negative-elevation result (the caller is responsible for freezing
@@ -37,11 +53,8 @@ export function computeTrackerRotationDeg(
   axisAzimuthDeg: number,
   maxRotationDeg: number,
 ): number {
-  const deltaAzRad = (axisAzimuthDeg - solarAzimuthDeg) * DEG2RAD;
-  const elevationRad = solarElevationDeg * DEG2RAD;
-  const rotationRad = Math.atan2(Math.sin(deltaAzRad), Math.tan(elevationRad));
-  const rotationDeg = rotationRad * RAD2DEG;
-  return clamp(rotationDeg, -maxRotationDeg, maxRotationDeg);
+  const solarAngleDeg = computeSolarAngleDeg(solarAzimuthDeg, solarElevationDeg, axisAzimuthDeg);
+  return clamp(solarAngleDeg, -maxRotationDeg, maxRotationDeg);
 }
 
 // East-west width (m) of the shadow a panel casts, given its rotation angle and the sun's

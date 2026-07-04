@@ -54,27 +54,37 @@ the file operations npm needs. Work on a real local disk.
     silently defaulting to a fake 06:00–18:00 window.
 - **`src/trackerMath.ts`** — pure tracker geometry math, no three.js dependency, independently
   testable:
-  - `computeTrackerRotationDeg` — single-axis tracking formula (`rotation = atan2(sin(axisAzimuth
-    - solarAzimuth), tan(solarElevation))`, clamped). Note the subtraction order (axis minus
-    solar, not the reverse) — that's what makes `axisAzimuthDeg=0` (a plain north-south axis)
-    rotate correctly given how `tracker.ts` maps `rotation.z` to which side of the row tilts up.
-    `axisAzimuthDeg` only changes this tracking-angle calculation; it does **not** rotate the row
-    in 3D (see `tracker.ts`) — an earlier version tried to do both, using a yaw rotation on the
-    row group, but combining a yaw with this formula's sign convention without re-deriving the
-    formula for it flipped the default tracking direction. Removed rather than re-derived, to
-    keep this formula's correctness easy to verify.
+  - `computeSolarAngleDeg` — the sun-facing angle implied by the sun's actual position, via
+    `rotation = atan2(sin(axisAzimuth - solarAzimuth), tan(solarElevation))`. Note the
+    subtraction order (axis minus solar, not the reverse) — that's what makes `axisAzimuthDeg=0`
+    (a plain north-south axis) rotate correctly given how `tracker.ts` maps `rotation.z` to
+    which side of the row tilts up. **Unclamped** — a property of the sun, not the tracker, so
+    it can (and near sunrise/sunset, will) exceed a real tracker's mechanical range; that's the
+    intended behavior for the "Solar angle" reading (`readingsPanel.ts`), which is meant to be
+    comparable to (and can visibly diverge from) the tracker's actual, clamped angle.
+  - `computeTrackerRotationDeg` — `computeSolarAngleDeg`, clamped to `maxRotationDeg`. This is
+    what actually gets applied to the rendered rows. `axisAzimuthDeg` only changes this
+    tracking-angle calculation; it does **not** rotate the row in 3D (see `tracker.ts`) — an
+    earlier version tried to do both, using a yaw rotation on the row group, but combining a yaw
+    with this formula's sign convention without re-deriving the formula for it flipped the
+    default tracking direction. Removed rather than re-derived, to keep this formula's
+    correctness easy to verify.
   - `computeShadowFootprintWidthM` / `computeAntiTrackingRotationDeg` — support the
     tracking/anti-tracking schedule bar in `timeControl.ts`. Anti-tracking rotates 90deg off the
-    sun-facing angle (clamped to `maxRotationDeg`, so in practice it mostly drives to one of the
-    two mechanical end-stops) toward whichever side — east or west — casts the smaller shadow,
-    per `computeShadowFootprintWidthM`'s east-west shadow-edge projection for that candidate
-    angle and the current sun direction.
+    (clamped) sun-facing angle (further clamped to `maxRotationDeg`, so in practice it mostly
+    drives to one of the two mechanical end-stops) toward whichever side — east or west — casts
+    the smaller shadow, per `computeShadowFootprintWidthM`'s east-west shadow-edge projection
+    for that candidate angle and the current sun direction.
   - `stepTowardDeg` — models a tracker motor's maximum slew rate
     (`tracker.maxRotationSpeedDegPerMin`, config.ts): moves the actual applied rotation toward
-    whichever target is currently active (tracking or anti-tracking) by at most that much per
-    real (wall-clock, not simulated) minute each frame, instead of snapping straight to it —
-    most noticeable when a tracking-mode schedule boundary is crossed, since the target angle
-    can jump by up to ~2x `maxRotationDeg` at once.
+    whichever target is currently active (tracking or anti-tracking) by at most that much,
+    instead of snapping straight to it. `main.ts` scales the step by
+    `max(simulated-minutes-elapsed, real-minutes-elapsed)` per frame — using simulated time alone
+    made a slider drag or fast "Play" look frozen (the tracker could take up to
+    `2 * maxRotationDeg / maxRotationSpeedDegPerMin` real minutes to catch up regardless of how
+    far simulated time actually jumped); using real time alone meant toggling a tracking-schedule
+    interval produced no visible motion at all while the clock was paused. Taking the max of
+    both covers both cases: whichever actually progressed since the last frame drives the step.
 - **`src/tracker.ts`** — builds one tracker row as two nested groups: an outer `anchorGroup` at
   ground level, never rotated, holding `tracker.postCount` static ground-to-hub support posts
   (one at each end of the row, the rest evenly spaced); and an inner `pivotGroup`, translated up
@@ -117,11 +127,12 @@ the file operations npm needs. Work on a real local disk.
   geometry state on change. Module width stays a fixed constant in `config.ts` — not exposed
   here.
 - **`src/readingsPanel.ts`** — a live 2-column readout (top-center): "Sun" (azimuth, altitude,
-  then solar angle) beside "Tracker" (rotational position — on the same CSS grid row as solar
-  angle specifically, not just visually near it, to make the two easy to compare: solar angle
-  is the "ideal" sun-facing angle from `computeTrackerRotationDeg`, while tracker rotation is
-  the actual applied, rate-limited value, which can differ during anti-tracking or while still
-  slewing toward a new target). Updated once per frame from `main.ts` with the same values
+  then solar angle) beside "Tracker" (tracker angle — on the same CSS grid row as solar angle
+  specifically, not just visually near it, to make the two easy to compare: solar angle is the
+  **unclamped** ideal sun-facing angle from `computeSolarAngleDeg`, while tracker angle uses the
+  same convention (0deg = horizontal, +-`maxRotationDeg` at full tilt) but is clamped and
+  rate-limited — the two can genuinely diverge during anti-tracking or while still slewing
+  toward a new target). Updated once per frame from `main.ts` with the same values
   already being applied to the sun light and tracker rows, so it always reflects what's
   actually rendered.
 - **`src/groundTexture.ts`** — a small procedural canvas texture (lighter, speckled green,
