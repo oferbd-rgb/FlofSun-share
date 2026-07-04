@@ -86,3 +86,13 @@ export function computeAntiTrackingRotationDeg(
   const westFootprint = computeShadowFootprintWidthM(westCandidate, moduleLengthM, sunDirX, sunDirY);
   return eastFootprint <= westFootprint ? eastCandidate : westCandidate;
 }
+
+// Moves currentDeg toward targetDeg by at most maxStepDeg (always >= 0), without overshooting —
+// models a real tracker motor's maximum slew rate, so switching tracking modes (or anything
+// else that changes the target angle abruptly) drives the tracker there gradually rather than
+// snapping instantly.
+export function stepTowardDeg(currentDeg: number, targetDeg: number, maxStepDeg: number): number {
+  const delta = targetDeg - currentDeg;
+  if (Math.abs(delta) <= maxStepDeg) return targetDeg;
+  return currentDeg + Math.sign(delta) * maxStepDeg;
+}

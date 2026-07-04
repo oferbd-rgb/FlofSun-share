@@ -2,7 +2,7 @@ import "./style.css";
 import { tracker as trackerCfg } from "./config";
 import { getDate, getLocation, getTrackerGeometry, getTrackingModeAt, onStateChange } from "./appState";
 import { getDaylightBounds, getSunAngles, localSolarTimeToDate, sunAzElToVector3 } from "./sunPosition";
-import { computeAntiTrackingRotationDeg, computeTrackerRotationDeg } from "./trackerMath";
+import { computeAntiTrackingRotationDeg, computeTrackerRotationDeg, stepTowardDeg } from "./trackerMath";
 import { createAppScene } from "./scene";
 import { createTimeControl } from "./timeControl";
 import { createLocationPicker } from "./locationPicker";
@@ -33,7 +33,8 @@ onStateChange(() => {
 });
 
 let lastFrameTime = performance.now();
-let lastRotationDeg = 0;
+let lastRotationDeg = 0; // the actual, rate-limited rotation currently applied to the rows
+let lastSolarAngleDeg = 0; // the "ideal" sun-facing angle (pre anti-track override), held while the sun is below the horizon
 
 function frame() {
   const now = performance.now();
@@ -47,29 +48,35 @@ function frame() {
   const sunDir = sunAzElToVector3(azimuthDeg, altitudeDeg);
   sunLightRig.updateSunPosition(sunDir);
 
+  let targetRotationDeg = lastRotationDeg;
   if (altitudeDeg > 0) {
     const geometry = getTrackerGeometry();
-    const trackingRotationDeg = computeTrackerRotationDeg(
+    lastSolarAngleDeg = computeTrackerRotationDeg(
       azimuthDeg,
       altitudeDeg,
       geometry.axisAzimuthDeg,
       trackerCfg.maxRotationDeg,
     );
-    lastRotationDeg =
+    targetRotationDeg =
       getTrackingModeAt(timeControl.getMinutesSinceMidnight()) === "track"
-        ? trackingRotationDeg
+        ? lastSolarAngleDeg
         : computeAntiTrackingRotationDeg(
-            trackingRotationDeg,
+            lastSolarAngleDeg,
             trackerCfg.maxRotationDeg,
             geometry.moduleLengthM,
             sunDir.x,
             sunDir.y,
           );
   }
+  // Real (wall-clock) time, not simulated time — so mode-switch transitions always animate
+  // smoothly regardless of playback speed or whether the simulated clock is even advancing.
+  const maxStepDeg = trackerCfg.maxRotationSpeedDegPerMin * (realDeltaSeconds / 60);
+  lastRotationDeg = stepTowardDeg(lastRotationDeg, targetRotationDeg, maxStepDeg);
+
   for (const row of rows) {
     row.setRotationDeg(lastRotationDeg);
   }
-  readingsPanel.update(azimuthDeg, altitudeDeg, lastRotationDeg);
+  readingsPanel.update(azimuthDeg, altitudeDeg, lastSolarAngleDeg, lastRotationDeg);
 
   controls.update();
   renderer.render(scene, camera);

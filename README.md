@@ -69,6 +69,12 @@ the file operations npm needs. Work on a real local disk.
     two mechanical end-stops) toward whichever side — east or west — casts the smaller shadow,
     per `computeShadowFootprintWidthM`'s east-west shadow-edge projection for that candidate
     angle and the current sun direction.
+  - `stepTowardDeg` — models a tracker motor's maximum slew rate
+    (`tracker.maxRotationSpeedDegPerMin`, config.ts): moves the actual applied rotation toward
+    whichever target is currently active (tracking or anti-tracking) by at most that much per
+    real (wall-clock, not simulated) minute each frame, instead of snapping straight to it —
+    most noticeable when a tracking-mode schedule boundary is crossed, since the target angle
+    can jump by up to ~2x `maxRotationDeg` at once.
 - **`src/tracker.ts`** — builds one tracker row as two nested groups: an outer `anchorGroup` at
   ground level, never rotated, holding `tracker.postCount` static ground-to-hub support posts
   (one at each end of the row, the rest evenly spaced); and an inner `pivotGroup`, translated up
@@ -110,11 +116,14 @@ the file operations npm needs. Work on a real local disk.
   hub height, row spacing, and axis azimuth, writing straight into `appState.ts`'s tracker
   geometry state on change. Module width stays a fixed constant in `config.ts` — not exposed
   here.
-- **`src/readingsPanel.ts`** — a live 2-column readout (top-center): "Sun" (azimuth, then
-  altitude below it) beside "Tracker" (rotational position — on the same CSS grid row as
-  altitude, not just visually near it). Updated once per frame from `main.ts` with the same
-  `azimuthDeg`/`altitudeDeg`/`lastRotationDeg` values already being applied to the sun light and
-  tracker rows, so it always reflects what's actually rendered.
+- **`src/readingsPanel.ts`** — a live 2-column readout (top-center): "Sun" (azimuth, altitude,
+  then solar angle) beside "Tracker" (rotational position — on the same CSS grid row as solar
+  angle specifically, not just visually near it, to make the two easy to compare: solar angle
+  is the "ideal" sun-facing angle from `computeTrackerRotationDeg`, while tracker rotation is
+  the actual applied, rate-limited value, which can differ during anti-tracking or while still
+  slewing toward a new target). Updated once per frame from `main.ts` with the same values
+  already being applied to the sun light and tracker rows, so it always reflects what's
+  actually rendered.
 - **`src/groundTexture.ts`** — a small procedural canvas texture (lighter, speckled green,
   tiled via `RepeatWrapping`) used as the ground's `map`, instead of a single flat color.
 - **`src/billboard.ts`** — signs textured with a logo image (`config.ts`'s `billboards.logoUrl`,

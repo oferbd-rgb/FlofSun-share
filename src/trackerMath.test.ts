@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { computeAntiTrackingRotationDeg, computeShadowFootprintWidthM, computeTrackerRotationDeg } from "./trackerMath";
+import {
+  computeAntiTrackingRotationDeg,
+  computeShadowFootprintWidthM,
+  computeTrackerRotationDeg,
+  stepTowardDeg,
+} from "./trackerMath";
 
 describe("computeTrackerRotationDeg", () => {
   it("returns 0 when the sun is exactly along the axis bearing, at any elevation", () => {
@@ -74,5 +79,26 @@ describe("computeAntiTrackingRotationDeg", () => {
     const result = computeAntiTrackingRotationDeg(10, 60, 2.5, 0.5, 0.5);
     expect(result).toBeGreaterThanOrEqual(-60);
     expect(result).toBeLessThanOrEqual(60);
+  });
+});
+
+describe("stepTowardDeg", () => {
+  it("reaches the target directly when it's within the step limit", () => {
+    expect(stepTowardDeg(10, 12, 5)).toBeCloseTo(12);
+    expect(stepTowardDeg(10, 10, 5)).toBeCloseTo(10);
+  });
+
+  it("moves only by maxStepDeg, toward the target, when the target is farther away", () => {
+    expect(stepTowardDeg(0, 100, 5)).toBeCloseTo(5);
+    expect(stepTowardDeg(0, -100, 5)).toBeCloseTo(-5);
+  });
+
+  it("never overshoots the target even when maxStepDeg is much larger than the gap", () => {
+    expect(stepTowardDeg(10, 12, 1000)).toBeCloseTo(12);
+  });
+
+  it("with maxStepDeg 0, doesn't move at all unless already at the target", () => {
+    expect(stepTowardDeg(10, 50, 0)).toBeCloseTo(10);
+    expect(stepTowardDeg(10, 10, 0)).toBeCloseTo(10);
   });
 });

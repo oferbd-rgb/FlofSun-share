@@ -45,6 +45,12 @@ export const tracker = {
   axisAzimuthDeg: 0,
   maxRotationDeg: 60, // symmetric rotation clamp; real hardware is often 45-50, tune here
   hubHeight: 3.0, // height of the rotation axis above the ground (m)
+  // Real tracker motors have a maximum slew rate — the rendered rotation moves toward its
+  // target (whichever of tracking/anti-tracking is active) by at most this much per real
+  // (wall-clock) minute each frame, rather than snapping instantly. Most noticeable when
+  // switching tracking modes, since the target angle can jump by up to ~2*maxRotationDeg at
+  // once — see main.ts's use of trackerMath.ts's stepTowardDeg.
+  maxRotationSpeedDegPerMin: 5,
 };
 
 export const scene = {
