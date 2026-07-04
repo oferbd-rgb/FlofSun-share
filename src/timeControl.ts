@@ -104,6 +104,23 @@ export function createTimeControl(container: HTMLElement, initialBounds: Dayligh
   const playButton = document.createElement("button");
   playButton.textContent = "Play";
 
+  // Speed multiple of the 1x base rate (animation.simMinutesPerRealSecond = 1 simulated hour
+  // per real second) — rounded, easy-to-reason-about options rather than a continuous slider.
+  let speedMultiplier = animation.defaultSpeedMultiplier;
+  const speedSelect = document.createElement("select");
+  speedSelect.className = "speed-select";
+  for (const option of animation.speedOptions) {
+    const optionEl = document.createElement("option");
+    optionEl.value = String(option);
+    optionEl.textContent = `${option}x`;
+    speedSelect.appendChild(optionEl);
+  }
+  speedSelect.value = String(speedMultiplier);
+  speedSelect.title = "Playback speed (1x = 1 simulated hour per real second)";
+  speedSelect.addEventListener("change", () => {
+    speedMultiplier = Number(speedSelect.value);
+  });
+
   const slider = document.createElement("input");
   slider.type = "range";
   slider.min = String(bounds.sunriseMinutes);
@@ -143,6 +160,7 @@ export function createTimeControl(container: HTMLElement, initialBounds: Dayligh
 
   panel.appendChild(dateInput);
   panel.appendChild(playButton);
+  panel.appendChild(speedSelect);
   panel.appendChild(sliderStack);
   panel.appendChild(clockReadout);
   panel.appendChild(tzNote);
@@ -156,7 +174,7 @@ export function createTimeControl(container: HTMLElement, initialBounds: Dayligh
     },
     advance(realDeltaSeconds: number) {
       if (!playing) return;
-      minutesSinceMidnight += realDeltaSeconds * animation.simMinutesPerRealSecond;
+      minutesSinceMidnight += realDeltaSeconds * animation.simMinutesPerRealSecond * speedMultiplier;
       if (minutesSinceMidnight > bounds.sunsetMinutes) {
         minutesSinceMidnight = bounds.sunriseMinutes;
       }

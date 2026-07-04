@@ -60,7 +60,9 @@ export const scene = {
 };
 
 export const animation = {
-  simMinutesPerRealSecond: 30, // ~1440 min / 30 => full day sweeps in ~48s when playing
+  simMinutesPerRealSecond: 60, // 1x speed = 1 simulated hour per real second
+  speedOptions: [1, 2, 5, 10, 20], // selectable multiples of the 1x base rate above
+  defaultSpeedMultiplier: 1,
 };
 
 export const billboards = {

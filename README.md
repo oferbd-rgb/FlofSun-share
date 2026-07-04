@@ -110,15 +110,17 @@ the file operations npm needs. Work on a real local disk.
   trees (so shadow behavior is visible independent of the moving panels). `scene.ts` rebuilds
   the tracker rows (disposing the old per-row geometries first) whenever `onGeometryChange`
   fires.
-- **`src/timeControl.ts`** — the date input + time slider + play/pause UI, plus a
-  tracking/anti-tracking schedule bar directly beneath the slider: one clickable segment per
+- **`src/timeControl.ts`** — the date input + time slider + play/pause + speed selector UI, plus
+  a tracking/anti-tracking schedule bar directly beneath the slider: one clickable segment per
   half-hour, toggling `appState.ts`'s `trackingSchedule` for that interval.
   `main.ts`'s render loop looks up the current interval's mode each frame via
   `getTrackingModeAt`. The bar is positioned/sized to exactly match the slider above it — it
   spans `[bounds.sunriseMinutes, bounds.sunsetMinutes]`, the same as the slider's own min/max
   (not a fixed 00:00-24:00 range), clipping any half-hour interval that only partially overlaps
   that range at either end. The underlying schedule storage is still the fixed 48-slot
-  00:00-24:00 clock, though — only the rendering is bounds-relative.
+  00:00-24:00 clock, though — only the rendering is bounds-relative. The speed selector picks a
+  rounded multiplier (`config.ts`'s `animation.speedOptions`) of the 1x base rate
+  (`animation.simMinutesPerRealSecond` = 60, i.e. 1x = 1 simulated hour per real second).
 - **`src/locationPicker.ts`** — the Leaflet world-map panel; click anywhere to relocate, with
   live reverse-geocoding via OpenStreetMap Nominatim (needs internet; falls back to a raw
   lat/lon label if the request fails).
@@ -126,12 +128,14 @@ the file operations npm needs. Work on a real local disk.
   hub height, row spacing, and axis azimuth, writing straight into `appState.ts`'s tracker
   geometry state on change. Module width stays a fixed constant in `config.ts` — not exposed
   here.
-- **`src/readingsPanel.ts`** — a live 2-column readout (top-center): "Sun" (azimuth, altitude,
-  then solar angle) beside "Tracker" (tracker angle — on the same CSS grid row as solar angle
-  specifically, not just visually near it, to make the two easy to compare: solar angle is the
-  **unclamped** ideal sun-facing angle from `computeSolarAngleDeg`, while tracker angle uses the
-  same convention (0deg = horizontal, +-`maxRotationDeg` at full tilt) but is clamped and
-  rate-limited — the two can genuinely diverge during anti-tracking or while still slewing
+- **`src/readingsPanel.ts`** — a live 2-column readout (bottom-left, positioned to clear above
+  `.time-control`'s wide centered bar rather than sitting flush in the corner — see the CSS
+  comment on `.readings-panel`): "Sun" (azimuth, altitude, then solar angle) beside "Tracker"
+  (tracker angle — on the same CSS grid row as solar angle specifically, not just visually near
+  it, to make the two easy to compare: solar angle is the **unclamped** ideal sun-facing angle
+  from `computeSolarAngleDeg`, while tracker angle uses the same convention (0deg = horizontal,
+  +-`maxRotationDeg` at full tilt) but is clamped and rate-limited — the two can genuinely
+  diverge during anti-tracking or while still slewing
   toward a new target). Updated once per frame from `main.ts` with the same values
   already being applied to the sun light and tracker rows, so it always reflects what's
   actually rendered.

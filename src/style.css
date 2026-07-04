@@ -4,6 +4,17 @@
   box-sizing: border-box;
 }
 
+:root {
+  --panel-bg: linear-gradient(160deg, rgba(32, 38, 50, 0.95), rgba(15, 18, 25, 0.95));
+  --panel-border: rgba(255, 255, 255, 0.09);
+  --panel-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --panel-radius: 12px;
+  --accent: #4fd1c5;
+  --text-primary: #edf1f6;
+  --text-muted: #99a3b3;
+  --mono-font: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
 html,
 body,
 #app {
@@ -46,6 +57,17 @@ canvas {
 
 .time-control button:hover {
   background: #38405a;
+}
+
+.speed-select {
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: #2a3040;
+  color: #f0f0f0;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
 }
 
 .time-control input[type="range"] {
@@ -110,20 +132,25 @@ canvas {
   position: fixed;
   top: 20px;
   right: 20px;
-  width: 200px;
-  padding: 10px;
-  background: rgba(20, 24, 32, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 10px;
-  color: #f0f0f0;
-  backdrop-filter: blur(6px);
+  width: 210px;
+  padding: 14px 16px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  box-shadow: var(--panel-shadow);
+  color: var(--text-primary);
+  backdrop-filter: blur(10px);
 }
 
 .geometry-control-title {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
-  margin-bottom: 8px;
-  color: #d5d8e0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--panel-border);
 }
 
 .geometry-control-row {
@@ -131,20 +158,26 @@ canvas {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-top: 6px;
-  font-size: 12px;
-  color: #d5d8e0;
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--text-muted);
 }
 
 .geometry-control-row input {
-  width: 70px;
-  padding: 3px 6px;
-  border-radius: 5px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: #2a3040;
-  color: #f0f0f0;
-  font-size: 12px;
-  font-family: inherit;
+  width: 72px;
+  padding: 4px 7px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-family: var(--mono-font);
+  text-align: right;
+}
+
+.geometry-control-row input:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
 .tracking-schedule-bar {
@@ -177,28 +210,40 @@ canvas {
 
 .readings-panel {
   position: fixed;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
+  /* Clears above .time-control (bottom:24px, ~60-90px tall) rather than sitting flush at the
+     very bottom-left pixel — .time-control is horizontally centered and wide enough (~800px)
+     to overlap a corner-anchored panel at common desktop viewport widths (~1280-1440px) if
+     they share the same vertical band. */
+  bottom: 100px;
+  left: 20px;
   display: grid;
   grid-template-columns: auto auto;
-  column-gap: 24px;
-  row-gap: 4px;
-  padding: 8px 18px;
-  background: rgba(20, 24, 32, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 10px;
-  color: #f0f0f0;
-  backdrop-filter: blur(6px);
+  column-gap: 28px;
+  row-gap: 6px;
+  padding: 14px 18px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  box-shadow: var(--panel-shadow);
+  color: var(--text-primary);
+  backdrop-filter: blur(10px);
 }
 
 .readings-label {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
-  color: #d5d8e0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--panel-border);
 }
 
 .readings-value {
-  font-size: 14px;
+  font-size: 13.5px;
+  font-family: var(--mono-font);
   font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  white-space: nowrap;
 }
