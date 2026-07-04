@@ -114,6 +114,14 @@ export function computeRowShadowIntervalX(
   return { startX: Math.min(shadowX1, shadowX2), endX: Math.max(shadowX1, shadowX2) };
 }
 
+// Half-width (m) of the ground swath the field of rows spans east-west, measured from the
+// centerline (X=0) to just past the outermost row (one extra rowSpacingM of margin beyond the
+// last row's own center) — shared by the Cumulative Sun Hours matrix (its x-domain) and the
+// report's top-down camera zoom (main.ts), so the two stay in sync as rowSpacingM changes live.
+export function computeFieldHalfWidthM(rowCount: number, rowSpacingM: number): number {
+  return ((rowCount - 1) / 2) * rowSpacingM + rowSpacingM;
+}
+
 // "Anti-tracking": instead of facing the sun (computeTrackerRotationDeg), rotate 90deg off
 // that angle — to whichever side (east, i.e. -90, or west, i.e. +90) yields the smaller
 // shadow footprint once clamped to the mechanical limit. A literal 90deg offset usually

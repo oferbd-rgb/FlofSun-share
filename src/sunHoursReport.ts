@@ -1,12 +1,18 @@
 import { tracker as trackerCfg } from "./config";
 import { getDate, getLocation, getTrackerGeometry, getTrackingModeAt } from "./appState";
 import { computeShadeMatrix, type ShadeMatrixResult } from "./shadeAnalysis";
+import { computeFieldHalfWidthM } from "./trackerMath";
 
-const CELL_WIDTH_PX = 6;
+export const X_BUCKET_COUNT = 90;
+const CELL_WIDTH_PX = 9; // 90 * 9 = 810px — ~50% wider than the original 6px cells, to better fill
+// the space above freed up by the shorter heatmap and let the top-down camera zoom (main.ts) match
+export const HEATMAP_CANVAS_WIDTH_PX = X_BUCKET_COUNT * CELL_WIDTH_PX;
 const HEATMAP_CELL_HEIGHT_PX = 1; // kept short so the live top-down 3D view stays visible above the panel
 const GRAPH_HEIGHT_PX = 60;
+const MIN_RANGE_MINUTES = 15;
 
 function formatClock(minutes: number): string {
+  if (minutes >= 24 * 60) return "24:00"; // the range handle's end can sit exactly at midnight-of-next-day
   const h = Math.floor(minutes / 60) % 24;
   const m = Math.floor(minutes % 60);
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
@@ -176,31 +182,6 @@ export function createSunHoursPanel(): SunHoursPanel {
     '<span class="sun-hours-legend-swatch sun-hours-legend-grey"></span> Shaded / night';
   panel.appendChild(legend);
 
-  // Dual-handle range slider (two overlaid native <input type="range">, thumbs only clickable —
-  // a standard lightweight pattern, see style.css) selecting which hours of the day the graph
-  // below sums over.
-  const rangeWrap = document.createElement("div");
-  rangeWrap.className = "sun-hours-range";
-  const rangeStartInput = document.createElement("input");
-  rangeStartInput.type = "range";
-  rangeStartInput.min = "0";
-  rangeStartInput.max = String(24 * 60);
-  rangeStartInput.step = "15";
-  rangeStartInput.value = String(rangeStartMinutes);
-  const rangeEndInput = document.createElement("input");
-  rangeEndInput.type = "range";
-  rangeEndInput.min = "0";
-  rangeEndInput.max = String(24 * 60);
-  rangeEndInput.step = "15";
-  rangeEndInput.value = String(rangeEndMinutes);
-  rangeWrap.appendChild(rangeStartInput);
-  rangeWrap.appendChild(rangeEndInput);
-  panel.appendChild(rangeWrap);
-
-  const rangeLabel = document.createElement("div");
-  rangeLabel.className = "sun-hours-range-label";
-  panel.appendChild(rangeLabel);
-
   const graphTitle = document.createElement("div");
   graphTitle.className = "sun-hours-panel-title";
   graphTitle.textContent = "Cumulative sun hours by position, for the selected window";
@@ -209,10 +190,6 @@ export function createSunHoursPanel(): SunHoursPanel {
   const graphWrap = document.createElement("div");
   graphWrap.className = "sun-hours-heatmap-wrap";
   panel.appendChild(graphWrap);
-
-  function refreshRangeLabel(): void {
-    rangeLabel.textContent = `Sum window: ${formatClock(rangeStartMinutes)} - ${formatClock(rangeEndMinutes)}`;
-  }
 
   function renderGraph(): void {
     if (!latestMatrix) return;
@@ -226,25 +203,57 @@ export function createSunHoursPanel(): SunHoursPanel {
     graphWrap.appendChild(canvasWrap);
   }
 
-  rangeStartInput.addEventListener("input", () => {
-    rangeStartMinutes = Math.min(Number(rangeStartInput.value), rangeEndMinutes - 15);
-    rangeStartInput.value = String(rangeStartMinutes);
-    refreshRangeLabel();
-    renderGraph();
-  });
-  rangeEndInput.addEventListener("input", () => {
-    rangeEndMinutes = Math.max(Number(rangeEndInput.value), rangeStartMinutes + 15);
-    rangeEndInput.value = String(rangeEndMinutes);
-    refreshRangeLabel();
-    renderGraph();
-  });
+  // Two draggable horizontal lines overlaid directly on the heatmap matrix — dragging either one
+  // up/down defines the [start, end) time-of-day window the graph below sums over. Each handle's
+  // hit area extends into the gutter between the hour labels and the canvas (where its own
+  // floating time label lives) and its visible line stretches all the way across the matrix.
+  function attachRangeHandle(handle: HTMLElement, label: HTMLElement, which: "start" | "end", canvasHeightPx: number): void {
+    function minutesToY(minutes: number): number {
+      return (minutes / (24 * 60)) * canvasHeightPx;
+    }
+    function reposition(): void {
+      const minutes = which === "start" ? rangeStartMinutes : rangeEndMinutes;
+      handle.style.top = `${minutesToY(minutes)}px`;
+      label.textContent = formatClock(minutes);
+    }
+    reposition();
+
+    handle.addEventListener("pointerdown", (event) => {
+      handle.setPointerCapture(event.pointerId);
+      handle.classList.add("is-dragging");
+      const wrapRect = handle.parentElement!.getBoundingClientRect();
+
+      function onMove(moveEvent: PointerEvent): void {
+        const relY = moveEvent.clientY - wrapRect.top;
+        const clampedY = Math.min(Math.max(relY, 0), canvasHeightPx);
+        let minutes = Math.round((clampedY / canvasHeightPx) * (24 * 60) / 15) * 15;
+        if (which === "start") {
+          minutes = Math.min(minutes, rangeEndMinutes - MIN_RANGE_MINUTES);
+          rangeStartMinutes = Math.max(0, minutes);
+        } else {
+          minutes = Math.max(minutes, rangeStartMinutes + MIN_RANGE_MINUTES);
+          rangeEndMinutes = Math.min(24 * 60, minutes);
+        }
+        reposition();
+        renderGraph();
+      }
+      function onUp(upEvent: PointerEvent): void {
+        handle.releasePointerCapture(upEvent.pointerId);
+        handle.classList.remove("is-dragging");
+        handle.removeEventListener("pointermove", onMove);
+        handle.removeEventListener("pointerup", onUp);
+      }
+      handle.addEventListener("pointermove", onMove);
+      handle.addEventListener("pointerup", onUp);
+    });
+  }
 
   function renderHeatmap(): void {
     heatmapWrap.replaceChildren();
     const location = getLocation();
     const date = getDate();
     const geometry = getTrackerGeometry();
-    const fieldHalfWidthM = ((trackerCfg.rowCount - 1) / 2) * geometry.rowSpacingM + geometry.rowSpacingM;
+    const fieldHalfWidthM = computeFieldHalfWidthM(trackerCfg.rowCount, geometry.rowSpacingM);
     latestMatrix = computeShadeMatrix({
       dateState: date,
       latitude: location.latitude,
@@ -258,21 +267,33 @@ export function createSunHoursPanel(): SunHoursPanel {
       getTrackingModeAt,
       xMin: -fieldHalfWidthM,
       xMax: fieldHalfWidthM,
-      xBucketCount: 90,
+      xBucketCount: X_BUCKET_COUNT,
       timeStepMinutes: 15,
     });
 
     heatmapWrap.appendChild(createHeatmapYAxis(latestMatrix));
     const canvasWrap = document.createElement("div");
     canvasWrap.className = "sun-hours-heatmap-canvas-wrap";
-    canvasWrap.appendChild(createHeatmapCanvas(latestMatrix));
+    const heatmapCanvas = createHeatmapCanvas(latestMatrix);
+    canvasWrap.appendChild(heatmapCanvas);
     canvasWrap.appendChild(createXAxis(latestMatrix));
+
+    const canvasHeightPx = latestMatrix.timeMinutes.length * HEATMAP_CELL_HEIGHT_PX;
+    for (const which of ["start", "end"] as const) {
+      const handle = document.createElement("div");
+      handle.className = "sun-hours-range-handle";
+      const label = document.createElement("span");
+      label.className = "sun-hours-range-handle-label";
+      handle.appendChild(label);
+      canvasWrap.appendChild(handle);
+      attachRangeHandle(handle, label, which, canvasHeightPx);
+    }
+
     heatmapWrap.appendChild(canvasWrap);
   }
 
   function refresh(): void {
     renderHeatmap();
-    refreshRangeLabel();
     renderGraph();
   }
 

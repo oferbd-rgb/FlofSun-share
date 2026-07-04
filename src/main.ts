@@ -1,9 +1,10 @@
 import "./style.css";
-import { scene as sceneCfg, tracker as trackerCfg } from "./config";
+import { tracker as trackerCfg } from "./config";
 import { getDate, getLocation, getTrackerGeometry, getTrackingModeAt, onGeometryChange, onStateChange } from "./appState";
 import { getDaylightBounds, getSunAngles, localSolarTimeToDate, sunAzElToVector3 } from "./sunPosition";
 import {
   computeAntiTrackingRotationDeg,
+  computeFieldHalfWidthM,
   computeSolarAngleDeg,
   computeTrackerRotationDeg,
   stepTowardDeg,
@@ -13,7 +14,7 @@ import { createTimeControl } from "./timeControl";
 import { createLocationPicker } from "./locationPicker";
 import { createGeometryControl } from "./geometryControl";
 import { createReadingsPanel } from "./readingsPanel";
-import { createSunHoursPanel, type SunHoursPanel } from "./sunHoursReport";
+import { createSunHoursPanel, HEATMAP_CANVAS_WIDTH_PX, type SunHoursPanel } from "./sunHoursReport";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const { scene, camera, renderer, controls, sunLightRig, rows } = createAppScene(app);
@@ -53,6 +54,27 @@ const savedControlsTarget = controls.target.clone();
 let reportActive = false;
 let sunHoursPanel: SunHoursPanel | null = null;
 
+// Zooms the still top-down camera so that world X = +-fieldHalfWidthM (the heatmap's own x-domain,
+// see shadeAnalysis.ts/sunHoursReport.ts) projects to exactly the heatmap canvas's own half-width
+// in screen pixels — i.e. the ground swath visible above the report panel matches, meter-for-meter,
+// what the matrix below it plots, so a row's shadow visible in the top view lines up with the same
+// x-position in the matrix. Re-run on geometry changes (rowSpacingM shifts fieldHalfWidthM) while
+// the report is open, alongside the panel's own refresh().
+//
+// Derivation: for a camera looking straight down from height H with vertical FOV, the on-screen
+// scale is (canvasHeightPx / (2 * H * tan(vFov/2))) pixels per world meter (independent of canvas
+// width — aspect ratio cancels out). Setting that equal to the desired scale
+// (HEATMAP_CANVAS_WIDTH_PX / (2 * fieldHalfWidthM)) and solving for H gives the formula below.
+function updateTopDownZoom(): void {
+  const geometry = getTrackerGeometry();
+  const fieldHalfWidthM = computeFieldHalfWidthM(trackerCfg.rowCount, geometry.rowSpacingM);
+  const vFovRad = (camera.fov * Math.PI) / 180;
+  const height = (window.innerHeight * fieldHalfWidthM) / (HEATMAP_CANVAS_WIDTH_PX * Math.tan(vFovRad / 2));
+  // Same tiny Z-only epsilon as before — avoids OrbitControls' vertical-look singularity while
+  // keeping the view axis-aligned with the row layout (rows run along world Z).
+  camera.position.set(0, height, 0.01);
+}
+
 function enterReportMode(): void {
   reportActive = true;
   timeControl.pause();
@@ -61,11 +83,7 @@ function enterReportMode(): void {
 
   savedCameraPosition.copy(camera.position);
   savedControlsTarget.copy(controls.target);
-  // A tiny Z-only offset (not X and Z both) avoids the vertical-look singularity in OrbitControls'
-  // internal spherical coordinates while keeping the view axis-aligned with the row layout (rows
-  // run along world Z) — an equal X/Z offset would instead put the camera on a 45deg diagonal,
-  // rendering the square ground as a rotated diamond instead of a clean top-down rectangle.
-  camera.position.set(0, sceneCfg.groundSize * 1.4, 0.01);
+  updateTopDownZoom();
   controls.target.set(0, 0, 0);
   controls.enabled = false; // "still" top view — no orbit/zoom/pan while the report is open
 
@@ -97,10 +115,14 @@ sunHoursButton.addEventListener("click", () => {
 });
 
 // Geometry changes already trigger scene.ts's rebuildRows (so the top-down 3D view updates on
-// its own) — this just keeps the heatmap matrix in sync while the report panel is open. Location
-// changes matter too (shading depends on lat/lng), so both trigger a refresh.
+// its own) — this keeps the heatmap matrix and the top-down camera's zoom (rowSpacingM shifts
+// fieldHalfWidthM, see updateTopDownZoom) in sync while the report panel is open. Location
+// changes matter too (shading depends on lat/lng), so both trigger a heatmap refresh.
 onGeometryChange(() => {
-  if (reportActive) sunHoursPanel?.refresh();
+  if (reportActive) {
+    updateTopDownZoom();
+    sunHoursPanel?.refresh();
+  }
 });
 onStateChange(() => {
   if (reportActive) sunHoursPanel?.refresh();

@@ -1,12 +1,25 @@
 import { describe, expect, it } from "vitest";
 import {
   computeAntiTrackingRotationDeg,
+  computeFieldHalfWidthM,
   computeRowShadowIntervalX,
   computeShadowFootprintWidthM,
   computeSolarAngleDeg,
   computeTrackerRotationDeg,
   stepTowardDeg,
 } from "./trackerMath";
+
+describe("computeFieldHalfWidthM", () => {
+  it("matches the default 4-row, 7.5m-spacing config", () => {
+    // Outermost row center sits at 1.5 * 7.5 = 11.25m from center; add one more rowSpacing of
+    // margin beyond it: 11.25 + 7.5 = 18.75m.
+    expect(computeFieldHalfWidthM(4, 7.5)).toBeCloseTo(18.75);
+  });
+
+  it("degenerates to just the margin for a single row", () => {
+    expect(computeFieldHalfWidthM(1, 7.5)).toBeCloseTo(7.5);
+  });
+});
 
 describe("computeSolarAngleDeg", () => {
   it("is not clamped to any tracker mechanical limit, unlike computeTrackerRotationDeg", () => {

@@ -273,7 +273,12 @@ canvas {
   left: 50%;
   bottom: 24px;
   transform: translateX(-50%);
-  max-width: 640px;
+  /* Fixed rather than auto/fit-content: the canvas (810px, see sunHoursReport.ts's
+     HEATMAP_CANVAS_WIDTH_PX) plus its y-axis gutter (46px) needs to sit exactly centered under
+     this panel's own center, since main.ts zooms the top-down 3D camera to match that same
+     canvas width — an auto-sized panel could let the title/legend text push it wider and throw
+     that alignment off. */
+  width: 900px;
   padding: 10px 18px;
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
@@ -294,85 +299,32 @@ canvas {
   border-bottom: 1px solid var(--panel-border);
 }
 
-.sun-hours-range {
-  position: relative;
-  height: 16px;
-  margin: 4px 0 2px 42px; /* left margin lines it up with the heatmap canvas, past the y-axis gutter */
-}
-
-.sun-hours-range input[type="range"] {
-  position: absolute;
-  top: 3px;
-  left: 0;
-  width: 100%;
-  margin: 0;
-  background: none;
-  pointer-events: none;
-  -webkit-appearance: none;
-  appearance: none;
-}
-
-.sun-hours-range input[type="range"]::-webkit-slider-runnable-track {
-  height: 4px;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 2px;
-}
-
-.sun-hours-range input[type="range"]::-webkit-slider-thumb {
-  pointer-events: auto;
-  -webkit-appearance: none;
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--accent);
-  cursor: pointer;
-  margin-top: -5px;
-}
-
-.sun-hours-range input[type="range"]::-moz-range-track {
-  height: 4px;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 2px;
-}
-
-.sun-hours-range input[type="range"]::-moz-range-thumb {
-  pointer-events: auto;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--accent);
-  cursor: pointer;
-  border: none;
-}
-
-.sun-hours-range-label {
-  font-size: 11px;
-  font-family: var(--mono-font);
-  color: var(--text-muted);
-  margin: 0 0 6px 42px;
-}
-
 .sun-hours-graph-canvas {
   display: block;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.2);
 }
 
+/* Each block (matrix, graph) sizes to exactly its canvas's width and centers that within the
+   panel — the y-axis label gutter and the drag-handle lines are positioned absolutely, outside
+   this box, so they don't push its width (and therefore its centering) off the canvas's own. */
 .sun-hours-heatmap-wrap {
-  display: flex;
-  gap: 4px;
+  position: relative;
+  width: fit-content;
+  margin: 0 auto;
 }
 
 .sun-hours-axis-y {
-  position: relative;
-  width: 42px;
-  flex-shrink: 0;
+  position: absolute;
+  top: 0;
+  right: 100%;
+  width: 40px;
+  margin-right: 6px;
 }
 
 .sun-hours-axis-y span {
   position: absolute;
-  left: 0;
+  right: 0;
   transform: translateY(-50%);
   font-size: 11px;
   font-family: var(--mono-font);
@@ -382,6 +334,50 @@ canvas {
 .sun-hours-heatmap-canvas-wrap {
   position: relative;
   padding-bottom: 16px;
+}
+
+/* A draggable horizontal line overlaid directly on the heatmap matrix, spanning from the y-axis
+   label gutter across the full canvas width — dragging it up/down (see sunHoursReport.ts's
+   attachRangeHandle) redefines the start/end of the summed time-of-day window. The floating
+   time label lives in the gutter, right where the hour-of-day axis labels are, so the currently
+   selected boundary reads directly against them. */
+.sun-hours-range-handle {
+  position: absolute;
+  left: -46px;
+  right: 0;
+  height: 11px;
+  margin-top: -5px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.sun-hours-range-handle::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 5px;
+  height: 2px;
+  background: var(--accent);
+}
+
+.sun-hours-range-handle:hover::before,
+.sun-hours-range-handle.is-dragging::before {
+  height: 3px;
+  top: 4px;
+  background: #7fe8dc;
+}
+
+.sun-hours-range-handle-label {
+  position: absolute;
+  left: 0;
+  top: -3px;
+  width: 40px;
+  font-size: 10px;
+  font-family: var(--mono-font);
+  color: var(--accent);
+  text-align: right;
+  pointer-events: none;
 }
 
 .sun-hours-heatmap-canvas {

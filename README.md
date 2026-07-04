@@ -174,25 +174,41 @@ the file operations npm needs. Work on a real local disk.
   visible above it. It has no fixed-data text summary — date and the tracking/anti-tracking
   schedule are shown live by the (trimmed) time-control bar instead, see below. Contents: a
   canvas-rendered binary grey/green heatmap from `computeShadeMatrix` (X = ground east-west
-  position, Y = time of day, grey covers both "shaded by a row" and "night"), a dual-handle hour
-  range slider (two overlaid native `<input type="range">`s, thumbs-only via
-  `pointer-events`/`::-webkit-slider-thumb` — a standard lightweight pattern, no library), and a
-  filled line-chart graph below the matrix showing cumulative sun-hours per x-position summed
-  over exactly the selected hour range (`computeSunHoursByX`). The "top view" above it is the
-  real scene itself, not a schematic drawing: `main.ts`'s `enterReportMode`/`exitReportMode`
-  switch the existing camera to a fixed, still, straight-down angle (disabling `OrbitControls`
-  for the duration) and hide only the momentary/instantaneous controls — the readings panel
-  entirely, and (via `timeControl.ts`'s `setCompact`) just the play button, speed select, scrub
-  slider, and clock from the time-control bar, leaving its date input and schedule bar in place.
-  Geometry-control and location-picker stay visible and live throughout.
-  `sunHoursPanel.refresh()` is re-invoked on `onGeometryChange`/`onStateChange` while the report
-  is open, so editing geometry or location visibly updates both the 3D row layout (already
-  reactive, via `scene.ts`'s `rebuildRows`) and the heatmap+graph together; dragging the hour
-  range slider only needs to redraw the graph, not recompute the underlying matrix. The top-down
-  camera offsets by a tiny amount on the Z axis only (not X and Z) before letting `OrbitControls`
-  re-derive its spherical coordinates from the new position — an equal X/Z offset would instead
-  put the camera on a 45deg diagonal, rendering the square ground as a rotated diamond instead of
-  a clean axis-aligned top-down rectangle.
+  position, Y = time of day, grey covers both "shaded by a row" and "night"), two draggable
+  horizontal lines overlaid directly on the matrix (`attachRangeHandle` — plain pointer-event
+  dragging, not native range inputs, so each line can render as a full-width bar with its own
+  floating time label in the y-axis gutter, dragged with the mouse rather than a side-to-side
+  slider) that define the [start, end) time-of-day window, and a filled line-chart graph below
+  showing cumulative sun-hours per x-position summed over exactly that window
+  (`computeSunHoursByX`). The heatmap/graph canvas is a fixed `HEATMAP_CANVAS_WIDTH_PX` (810px —
+  90 x-buckets at 9px each) and is centered under the panel independent of the y-axis label
+  gutter (`.sun-hours-heatmap-wrap` in style.css: `width: fit-content; margin: 0 auto`, with the
+  gutter absolutely positioned outside that box) so its horizontal center always lands on the
+  window's own center — which is exactly where world X=0 projects to, since the top-down camera
+  sits directly above the origin.
+  The "top view" above the panel is the real scene itself, not a schematic drawing: `main.ts`'s
+  `enterReportMode`/`exitReportMode` switch the existing camera to a fixed, still, straight-down
+  angle (disabling `OrbitControls` for the duration) and hide only the momentary/instantaneous
+  controls — the readings panel entirely, and (via `timeControl.ts`'s `setCompact`) just the play
+  button, speed select, scrub slider, and clock from the time-control bar, leaving its date input
+  and schedule bar in place. Geometry-control and location-picker stay visible and live
+  throughout. `main.ts`'s `updateTopDownZoom` keeps the camera's height tuned so that world X =
+  `+-fieldHalfWidthM` (`trackerMath.ts`'s `computeFieldHalfWidthM`, the same value the matrix uses
+  for its own x-domain) projects to exactly `+-HEATMAP_CANVAS_WIDTH_PX/2` screen pixels around
+  that shared center — meaning a row's shadow visible in the top-down view lines up, pixel for
+  pixel, with the same x-position in the matrix below it (verified directly via
+  `Vector3.project(camera)` against the matrix's own x-to-pixel formula). The derivation (in
+  `updateTopDownZoom`'s comment): for a camera looking straight down, on-screen scale is
+  `canvasHeightPx / (2 * H * tan(vFov/2))` px/meter — independent of canvas *width* since aspect
+  ratio cancels out — so solving for `H` against the desired scale gives the camera height.
+  `sunHoursPanel.refresh()` (heatmap + graph) and `updateTopDownZoom()` (camera height) both
+  re-run on `onGeometryChange`/`onStateChange` while the report is open, so editing row spacing
+  or location keeps the 3D layout, the zoom, and the heatmap all in sync; dragging an hour-range
+  handle only needs to redraw the graph, not recompute the underlying matrix or re-zoom. The
+  top-down camera offsets by a tiny amount on the Z axis only (not X and Z) before letting
+  `OrbitControls` re-derive its spherical coordinates from the new position — an equal X/Z offset
+  would instead put the camera on a 45deg diagonal, rendering the square ground as a rotated
+  diamond instead of a clean axis-aligned top-down rectangle.
 
 The demo tracker is configured as a **1P** (one module wide per row, portrait orientation)
 layout.
