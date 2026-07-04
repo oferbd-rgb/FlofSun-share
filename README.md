@@ -85,7 +85,11 @@ the file operations npm needs. Work on a real local disk.
   `shadeLine` in `config.ts`, for gauging tracker shadow position/length at a glance — a
   half-cylinder with the flat/open side down and the dome up, rather than a flat plane, so it
   catches highlights from a range of viewing angles instead of only reflecting strongly from
-  directly overhead), the shadow-casting `DirectionalLight` positioned along the computed sun
+  directly overhead — note that `CylinderGeometry`'s local vertices are `(r*sin(theta), y,
+  r*cos(theta))`, not `(r*cos, r*sin)` as the parameter names might suggest; verify against the
+  actual `BufferGeometry` data before picking a `thetaStart`/`thetaLength`, since guessing this
+  wrong once already silently produced a shape that bulged sideways instead of straight up),
+  the shadow-casting `DirectionalLight` positioned along the computed sun
   vector, a visible sun marker sphere, tracker rows, compass labels (N/E/S/W), and a few static
   trees (so shadow behavior is visible independent of the moving panels). `scene.ts` rebuilds
   the tracker rows (disposing the old per-row geometries first) whenever `onGeometryChange`
@@ -106,6 +110,11 @@ the file operations npm needs. Work on a real local disk.
   hub height, row spacing, and axis azimuth, writing straight into `appState.ts`'s tracker
   geometry state on change. Module width stays a fixed constant in `config.ts` — not exposed
   here.
+- **`src/readingsPanel.ts`** — a live 2-column readout (top-center): "Sun" (azimuth, then
+  altitude below it) beside "Tracker" (rotational position — on the same CSS grid row as
+  altitude, not just visually near it). Updated once per frame from `main.ts` with the same
+  `azimuthDeg`/`altitudeDeg`/`lastRotationDeg` values already being applied to the sun light and
+  tracker rows, so it always reflects what's actually rendered.
 - **`src/groundTexture.ts`** — a small procedural canvas texture (lighter, speckled green,
   tiled via `RepeatWrapping`) used as the ground's `map`, instead of a single flat color.
 - **`src/billboard.ts`** — signs textured with a logo image (`config.ts`'s `billboards.logoUrl`,

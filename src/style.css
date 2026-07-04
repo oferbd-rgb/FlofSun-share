@@ -174,3 +174,31 @@ canvas {
 .tracking-schedule-segment.is-anti-tracking {
   background: #b5641f;
 }
+
+.readings-panel {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: auto auto;
+  column-gap: 24px;
+  row-gap: 4px;
+  padding: 8px 18px;
+  background: rgba(20, 24, 32, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  color: #f0f0f0;
+  backdrop-filter: blur(6px);
+}
+
+.readings-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #d5d8e0;
+}
+
+.readings-value {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}

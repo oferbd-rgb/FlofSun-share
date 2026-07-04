@@ -48,10 +48,13 @@ export function createAppScene(canvasContainer: HTMLElement): AppScene {
   // only reflecting strongly from directly overhead.
   const shadeLineRadius = shadeLineCfg.widthM / 2;
   const shadeLine = new Mesh(
-    // thetaStart=-PI/2, thetaLength=PI sweeps the half of the circle where local X >= 0; after
-    // the Y->X axis rotation below, local X becomes world Y, so this half sits at world Y >= 0
-    // (the dome), leaving the flat open side down at the ground.
-    new CylinderGeometry(shadeLineRadius, shadeLineRadius, sceneCfg.groundSize, 24, 1, true, -Math.PI / 2, Math.PI),
+    // CylinderGeometry's local vertices are (r*sin(theta), y, r*cos(theta)) — not (r*cos, r*sin)
+    // as the naming suggests (verified directly against the actual BufferGeometry data, since
+    // guessing this convention wrong once already silently produced a sideways-bulging shape).
+    // thetaStart=0, thetaLength=PI sweeps theta in [0,PI], where sin(theta) >= 0 throughout, so
+    // local X >= 0 always; after the Y->X axis rotation below (local X becomes world Y), that
+    // sits at world Y >= 0 (the dome), leaving the flat open side down at the ground.
+    new CylinderGeometry(shadeLineRadius, shadeLineRadius, sceneCfg.groundSize, 24, 1, true, 0, Math.PI),
     new MeshStandardMaterial({ color: shadeLineCfg.color, roughness: 0.3, metalness: 0.5 }),
   );
   shadeLine.rotation.z = Math.PI / 2; // cylinder axis Y -> X (runs east-west)
