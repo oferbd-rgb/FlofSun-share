@@ -15,12 +15,34 @@ import { createLocationPicker } from "./locationPicker";
 import { createGeometryControl } from "./geometryControl";
 import { createReadingsPanel } from "./readingsPanel";
 import { createSunHoursPanel, HEATMAP_CANVAS_WIDTH_PX, type SunHoursPanel } from "./sunHoursReport";
+import { createClearSkyIrradianceProvider } from "./irradiance";
+import { computeGroundRadiationGrid, computeRowLengthM } from "./groundRadiation";
+import { createGroundRadiationOverlay } from "./groundRadiationOverlay";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const { scene, camera, renderer, controls, sunLightRig, rows } = createAppScene(app);
 
 createGeometryControl(app);
 const readingsPanel = createReadingsPanel(app);
+
+// --- Ground radiation overlay: a live, ground-hugging heatmap (10cm grid) showing each point's
+// radiation as a percentage of unshaded GHI — 100% where sunlit, view-factor-to-sky-weighted
+// diffuse-only where a row shades it. See groundRadiation.ts for the physics/performance approach.
+const irradianceProvider = createClearSkyIrradianceProvider();
+const groundRadiationOverlay = createGroundRadiationOverlay();
+scene.add(groundRadiationOverlay.mesh);
+
+const radiationToggleButton = document.createElement("button");
+radiationToggleButton.className = "ground-radiation-toggle-button";
+radiationToggleButton.textContent = "Ground radiation";
+app.appendChild(radiationToggleButton);
+
+let radiationOverlayVisible = false;
+radiationToggleButton.addEventListener("click", () => {
+  radiationOverlayVisible = !radiationOverlayVisible;
+  groundRadiationOverlay.setVisible(radiationOverlayVisible);
+  radiationToggleButton.classList.toggle("is-active", radiationOverlayVisible);
+});
 
 // minutesSinceMidnight is local SOLAR time at the selected site (see sunPosition.ts) —
 // not the browser's system timezone.
@@ -133,6 +155,41 @@ let lastRotationDeg = 0; // the actual, rate-limited rotation currently applied 
 let lastSolarAngleDeg = 0; // unclamped ideal sun-facing angle, for the "Solar angle" reading only — not applied to the hardware
 let lastKnownMinutesSinceMidnight = timeControl.getMinutesSinceMidnight();
 
+// Recomputing the full ground-radiation grid every single frame is unnecessary (the sun/tracker
+// only move meaningfully every so often at this app's simulated speeds) and would waste work
+// while the overlay is hidden — throttled to a few times a second, and skipped entirely unless
+// the toggle is on.
+const RADIATION_UPDATE_INTERVAL_MS = 300;
+let lastRadiationUpdateTime = 0;
+
+function updateGroundRadiationOverlay(rotationDeg: number, altitudeDeg: number, sunDirX: number, sunDirY: number, sunDirZ: number): void {
+  const geometry = getTrackerGeometry();
+  const fieldHalfWidthM = computeFieldHalfWidthM(trackerCfg.rowCount, geometry.rowSpacingM);
+  const halfRowLengthM = computeRowLengthM(trackerCfg.modulesPerRow, trackerCfg.moduleWidth, trackerCfg.moduleGap) / 2;
+  const zMarginM = 5; // "around" the tracker, not just directly beneath it
+  const { dni, dhi } = irradianceProvider.getIrradiance(altitudeDeg);
+
+  const grid = computeGroundRadiationGrid({
+    rowCount: trackerCfg.rowCount,
+    rowSpacingM: geometry.rowSpacingM,
+    moduleLengthM: geometry.moduleLengthM,
+    hubHeightM: geometry.hubHeightM,
+    rotationDeg,
+    sunDirX,
+    sunDirY,
+    sunDirZ,
+    dni,
+    dhi,
+    xMin: -fieldHalfWidthM,
+    xMax: fieldHalfWidthM,
+    xStepM: 0.1,
+    zMin: -halfRowLengthM - zMarginM,
+    zMax: halfRowLengthM + zMarginM,
+    zStepM: 0.1,
+  });
+  groundRadiationOverlay.update(grid);
+}
+
 function frame() {
   const now = performance.now();
   const realDeltaSeconds = (now - lastFrameTime) / 1000;
@@ -191,6 +248,11 @@ function frame() {
     row.setRotationDeg(lastRotationDeg);
   }
   readingsPanel.update(azimuthDeg, altitudeDeg, lastSolarAngleDeg, lastRotationDeg);
+
+  if (radiationOverlayVisible && now - lastRadiationUpdateTime >= RADIATION_UPDATE_INTERVAL_MS) {
+    lastRadiationUpdateTime = now;
+    updateGroundRadiationOverlay(lastRotationDeg, altitudeDeg, sunDir.x, sunDir.y, sunDir.z);
+  }
 
   controls.update();
   renderer.render(scene, camera);

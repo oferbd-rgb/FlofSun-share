@@ -3,11 +3,40 @@ import {
   computeAntiTrackingRotationDeg,
   computeFieldHalfWidthM,
   computeRowShadowIntervalX,
+  computeRowShadowZShift,
+  computeRowWorldXPositions,
   computeShadowFootprintWidthM,
   computeSolarAngleDeg,
   computeTrackerRotationDeg,
   stepTowardDeg,
 } from "./trackerMath";
+
+describe("computeRowWorldXPositions", () => {
+  it("centers rows symmetrically around X=0", () => {
+    expect(computeRowWorldXPositions(4, 7.5)).toEqual([-11.25, -3.75, 3.75, 11.25]);
+  });
+
+  it("places a single row exactly at X=0", () => {
+    expect(computeRowWorldXPositions(1, 7.5)).toEqual([0]);
+  });
+});
+
+describe("computeRowShadowZShift", () => {
+  it("is zero when the sun is due east/west (no north-south component)", () => {
+    expect(computeRowShadowZShift(3, 0, 0.5)).toBe(0);
+  });
+
+  it("is zero when the sun is at or below the horizon", () => {
+    expect(computeRowShadowZShift(3, 0.5, 0)).toBe(0);
+    expect(computeRowShadowZShift(3, 0.5, -0.1)).toBe(0);
+  });
+
+  it("shifts further for a lower sun (smaller sunDirY) at the same north-south component", () => {
+    const highSun = Math.abs(computeRowShadowZShift(3, 0.3, 0.8));
+    const lowSun = Math.abs(computeRowShadowZShift(3, 0.3, 0.2));
+    expect(lowSun).toBeGreaterThan(highSun);
+  });
+});
 
 describe("computeFieldHalfWidthM", () => {
   it("matches the default 4-row, 7.5m-spacing config", () => {

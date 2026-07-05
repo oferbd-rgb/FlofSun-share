@@ -2,6 +2,23 @@ import { tracker as trackerCfg } from "./config";
 import { getDate, getLocation, getTrackerGeometry, getTrackingModeAt } from "./appState";
 import { computeShadeMatrix, type ShadeMatrixResult } from "./shadeAnalysis";
 import { computeFieldHalfWidthM } from "./trackerMath";
+import { createClearSkyIrradianceProvider } from "./irradiance";
+
+const irradianceProvider = createClearSkyIrradianceProvider();
+
+// Same two-stop gradient as groundRadiationOverlay.ts's live 3D overlay (kept as a separate,
+// duplicated constant rather than a shared import, since that module pulls in three.js and this
+// one is deliberately DOM-only) — dark indigo (heavily shaded) to warm yellow (full unshaded GHI).
+const LOW_COLOR = { r: 30, g: 30, b: 70 };
+const HIGH_COLOR = { r: 255, g: 210, b: 60 };
+
+function colorForPercent(percent: number): string {
+  const t = Math.max(0, Math.min(1, percent / 100));
+  const r = Math.round(LOW_COLOR.r + (HIGH_COLOR.r - LOW_COLOR.r) * t);
+  const g = Math.round(LOW_COLOR.g + (HIGH_COLOR.g - LOW_COLOR.g) * t);
+  const b = Math.round(LOW_COLOR.b + (HIGH_COLOR.b - LOW_COLOR.b) * t);
+  return `rgb(${r}, ${g}, ${b})`;
+}
 
 export const X_BUCKET_COUNT = 90;
 const CELL_WIDTH_PX = 9; // 90 * 9 = 810px — ~50% wider than the original 6px cells, to better fill
@@ -18,8 +35,9 @@ function formatClock(minutes: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-// Grey/green binary heatmap: grey = not under direct sunlight (night OR shaded by a row),
-// green = under direct sunlight. X = ground east-west position, Y = time of day.
+// Continuous radiation-percentage heatmap (0-100% of unshaded GHI) — same color gradient as the
+// live 3D ground overlay, so the two visualizations read consistently. X = ground east-west
+// position, Y = time of day.
 function createHeatmapCanvas(matrix: ShadeMatrixResult): HTMLCanvasElement {
   const xCount = matrix.xEdges.length - 1;
   const yCount = matrix.timeMinutes.length;
@@ -32,8 +50,7 @@ function createHeatmapCanvas(matrix: ShadeMatrixResult): HTMLCanvasElement {
   const ctx = canvas.getContext("2d")!;
   for (let ti = 0; ti < yCount; ti++) {
     for (let xi = 0; xi < xCount; xi++) {
-      const sunlit = matrix.sunUp[ti] && !matrix.shaded[ti][xi];
-      ctx.fillStyle = sunlit ? "#3ba55c" : "#6b7280";
+      ctx.fillStyle = colorForPercent(matrix.percentOfGHI[ti][xi]);
       ctx.fillRect(xi * CELL_WIDTH_PX, ti * HEATMAP_CELL_HEIGHT_PX, CELL_WIDTH_PX, HEATMAP_CELL_HEIGHT_PX);
     }
   }
@@ -86,7 +103,10 @@ function createXAxis(matrix: ShadeMatrixResult): HTMLElement {
   return axis;
 }
 
-// Per-x total hours of direct (unshaded, daytime) sunlight within [startMinutes, endMinutes).
+// Per-x cumulative "effective full-sun hours" within [startMinutes, endMinutes) — each time
+// sample contributes (percentOfGHI/100) * timeStepHours, rather than a plain binary sunlit-hour
+// count, so a partially-shaded point (getting only view-factor-weighted diffuse light) counts for
+// a fraction of an hour instead of either a whole hour or none.
 function computeSunHoursByX(matrix: ShadeMatrixResult, startMinutes: number, endMinutes: number): number[] {
   const xCount = matrix.xEdges.length - 1;
   const sums = new Array(xCount).fill(0);
@@ -96,7 +116,7 @@ function computeSunHoursByX(matrix: ShadeMatrixResult, startMinutes: number, end
   matrix.timeMinutes.forEach((minutes, ti) => {
     if (minutes < startMinutes || minutes >= endMinutes || !matrix.sunUp[ti]) return;
     for (let xi = 0; xi < xCount; xi++) {
-      if (!matrix.shaded[ti][xi]) sums[xi] += timeStepHours;
+      sums[xi] += (matrix.percentOfGHI[ti][xi] / 100) * timeStepHours;
     }
   });
   return sums;
@@ -178,8 +198,7 @@ export function createSunHoursPanel(): SunHoursPanel {
   const legend = document.createElement("div");
   legend.className = "sun-hours-legend";
   legend.innerHTML =
-    '<span class="sun-hours-legend-swatch sun-hours-legend-green"></span> Direct sunlight' +
-    '<span class="sun-hours-legend-swatch sun-hours-legend-grey"></span> Shaded / night';
+    `<span>0%</span><span class="sun-hours-legend-gradient"></span><span>100% of unshaded GHI</span>`;
   panel.appendChild(legend);
 
   const graphTitle = document.createElement("div");
@@ -265,6 +284,7 @@ export function createSunHoursPanel(): SunHoursPanel {
       rowSpacingM: geometry.rowSpacingM,
       rowCount: trackerCfg.rowCount,
       getTrackingModeAt,
+      irradianceProvider,
       xMin: -fieldHalfWidthM,
       xMax: fieldHalfWidthM,
       xBucketCount: X_BUCKET_COUNT,

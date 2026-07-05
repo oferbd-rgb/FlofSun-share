@@ -6,9 +6,12 @@ import { getSunAngles, localSolarTimeToDate } from "./sunPosition";
 import {
   computeAntiTrackingRotationDeg,
   computeRowShadowIntervalX,
+  computeRowWorldXPositions,
   computeTrackerRotationDeg,
   type ShadowInterval,
 } from "./trackerMath";
+import { computeViewFactorToSkyInterior } from "./groundRadiation";
+import { computeUnshadedGHI, type IrradianceProvider } from "./irradiance";
 
 const DEG2RAD = Math.PI / 180;
 
@@ -25,6 +28,7 @@ export interface ShadeMatrixParams {
   rowSpacingM: number;
   rowCount: number;
   getTrackingModeAt: TrackingModeAt;
+  irradianceProvider: IrradianceProvider;
   xMin: number;
   xMax: number;
   xBucketCount: number;
@@ -35,15 +39,8 @@ export interface ShadeMatrixResult {
   xEdges: number[]; // length xBucketCount + 1, bucket boundaries in meters (ground east-west)
   timeMinutes: number[]; // sample times, local-solar minutes since midnight
   shaded: boolean[][]; // [timeIndex][xIndex] — true = in a row's shadow, false = sunlit
+  percentOfGHI: number[][]; // [timeIndex][xIndex] — 100 when sunlit, view-factor-weighted diffuse-only % when shaded, 0 at night
   sunUp: boolean[]; // per time sample — false = below horizon (no direct sun anywhere)
-}
-
-function rowWorldXPositions(rowCount: number, rowSpacingM: number): number[] {
-  const positions: number[] = [];
-  for (let i = 0; i < rowCount; i++) {
-    positions.push((i - (rowCount - 1) / 2) * rowSpacingM);
-  }
-  return positions;
 }
 
 function isWithin(x: number, interval: ShadowInterval): boolean {
@@ -68,6 +65,7 @@ export function computeShadeMatrix(params: ShadeMatrixParams): ShadeMatrixResult
     rowSpacingM,
     rowCount,
     getTrackingModeAt,
+    irradianceProvider,
     xMin,
     xMax,
     xBucketCount,
@@ -80,10 +78,11 @@ export function computeShadeMatrix(params: ShadeMatrixParams): ShadeMatrixResult
   }
   const xCenters = xEdges.slice(0, xBucketCount).map((edge, i) => (edge + xEdges[i + 1]) / 2);
 
-  const rowXs = rowWorldXPositions(rowCount, rowSpacingM);
+  const rowXs = computeRowWorldXPositions(rowCount, rowSpacingM);
 
   const timeMinutes: number[] = [];
   const shaded: boolean[][] = [];
+  const percentOfGHI: number[][] = [];
   const sunUp: boolean[] = [];
 
   for (let minutes = 0; minutes < 24 * 60; minutes += timeStepMinutes) {
@@ -93,7 +92,11 @@ export function computeShadeMatrix(params: ShadeMatrixParams): ShadeMatrixResult
     const isSunUp = altitudeDeg > 0;
     sunUp.push(isSunUp);
 
-    const row = new Array<boolean>(xBucketCount).fill(false);
+    const shadedRow = new Array<boolean>(xBucketCount).fill(false);
+    // Below the horizon: no direct beam and (this fallback clear-sky model, at least) no diffuse
+    // either, so every point is simply dark — matches groundRadiation.ts's own sun-down handling.
+    const percentRow = new Array<number>(xBucketCount).fill(0);
+
     if (isSunUp) {
       const azRad = azimuthDeg * DEG2RAD;
       const elRad = altitudeDeg * DEG2RAD;
@@ -110,12 +113,24 @@ export function computeShadeMatrix(params: ShadeMatrixParams): ShadeMatrixResult
         .map((rowX) => computeRowShadowIntervalX(rotationDeg, moduleLengthM, hubHeightM, rowX, sunDirX, sunDirY))
         .filter((interval): interval is ShadowInterval => interval !== null);
 
+      const { dni, dhi } = irradianceProvider.getIrradiance(altitudeDeg);
+      const unshadedGHI = computeUnshadedGHI(dni, dhi, sunDirY);
+      const panelRows = { rowXs, rotationDeg, moduleLengthM, hubHeightM };
+
       for (let xi = 0; xi < xBucketCount; xi++) {
-        row[xi] = intervals.some((interval) => isWithin(xCenters[xi], interval));
+        const isShaded = intervals.some((interval) => isWithin(xCenters[xi], interval));
+        shadedRow[xi] = isShaded;
+        if (!isShaded) {
+          percentRow[xi] = 100;
+        } else if (unshadedGHI > 0) {
+          const viewFactor = computeViewFactorToSkyInterior(xCenters[xi], panelRows);
+          percentRow[xi] = ((viewFactor * dhi) / unshadedGHI) * 100;
+        }
       }
     }
-    shaded.push(row);
+    shaded.push(shadedRow);
+    percentOfGHI.push(percentRow);
   }
 
-  return { xEdges, timeMinutes, shaded, sunUp };
+  return { xEdges, timeMinutes, shaded, percentOfGHI, sunUp };
 }
