@@ -113,7 +113,7 @@ export function computeShadeMatrix(params: ShadeMatrixParams): ShadeMatrixResult
         .map((rowX) => computeRowShadowIntervalX(rotationDeg, moduleLengthM, hubHeightM, rowX, sunDirX, sunDirY))
         .filter((interval): interval is ShadowInterval => interval !== null);
 
-      const { dni, dhi } = irradianceProvider.getIrradiance(altitudeDeg);
+      const { dni, dhi } = irradianceProvider.getIrradiance(altitudeDeg, dateState.month);
       const unshadedGHI = computeUnshadedGHI(dni, dhi, sunDirY);
       const panelRows = { rowXs, rotationDeg, moduleLengthM, hubHeightM };
 

@@ -15,7 +15,7 @@ import { createLocationPicker } from "./locationPicker";
 import { createGeometryControl } from "./geometryControl";
 import { createReadingsPanel } from "./readingsPanel";
 import { createSunHoursPanel, HEATMAP_CANVAS_WIDTH_PX, type SunHoursPanel } from "./sunHoursReport";
-import { createClearSkyIrradianceProvider } from "./irradiance";
+import { zoharIrradianceProvider } from "./irradiance";
 import { computeGroundRadiationGrid, computeRowLengthM } from "./groundRadiation";
 import { createGroundRadiationOverlay } from "./groundRadiationOverlay";
 
@@ -28,7 +28,7 @@ const readingsPanel = createReadingsPanel(app);
 // --- Ground radiation overlay: a live, ground-hugging heatmap (10cm grid) showing each point's
 // radiation as a percentage of unshaded GHI — 100% where sunlit, view-factor-to-sky-weighted
 // diffuse-only where a row shades it. See groundRadiation.ts for the physics/performance approach.
-const irradianceProvider = createClearSkyIrradianceProvider();
+const irradianceProvider = zoharIrradianceProvider;
 const groundRadiationOverlay = createGroundRadiationOverlay();
 scene.add(groundRadiationOverlay.mesh);
 
@@ -167,7 +167,7 @@ function updateGroundRadiationOverlay(rotationDeg: number, altitudeDeg: number, 
   const fieldHalfWidthM = computeFieldHalfWidthM(trackerCfg.rowCount, geometry.rowSpacingM);
   const halfRowLengthM = computeRowLengthM(trackerCfg.modulesPerRow, trackerCfg.moduleWidth, trackerCfg.moduleGap) / 2;
   const zMarginM = 5; // "around" the tracker, not just directly beneath it
-  const { dni, dhi } = irradianceProvider.getIrradiance(altitudeDeg);
+  const { dni, dhi } = irradianceProvider.getIrradiance(altitudeDeg, getDate().month);
 
   const grid = computeGroundRadiationGrid({
     rowCount: trackerCfg.rowCount,

@@ -2,9 +2,9 @@ import { tracker as trackerCfg } from "./config";
 import { getDate, getLocation, getTrackerGeometry, getTrackingModeAt } from "./appState";
 import { computeShadeMatrix, type ShadeMatrixResult } from "./shadeAnalysis";
 import { computeFieldHalfWidthM } from "./trackerMath";
-import { createClearSkyIrradianceProvider } from "./irradiance";
+import { zoharIrradianceProvider } from "./irradiance";
 
-const irradianceProvider = createClearSkyIrradianceProvider();
+const irradianceProvider = zoharIrradianceProvider;
 
 // Same two-stop gradient as groundRadiationOverlay.ts's live 3D overlay (kept as a separate,
 // duplicated constant rather than a shared import, since that module pulls in three.js and this

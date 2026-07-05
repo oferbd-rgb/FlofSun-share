@@ -25,7 +25,7 @@ export interface TrackerGeometryState {
 let currentLocation: LocationState = {
   latitude: defaultLocation.latitude,
   longitude: defaultLocation.longitude,
-  label: "Tel Aviv, Israel",
+  label: "Zohar, Israel",
 };
 
 let currentDate: DateState = { ...demoDate };

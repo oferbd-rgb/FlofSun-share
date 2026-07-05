@@ -161,18 +161,36 @@ the file operations npm needs. Work on a real local disk.
   reflects suncalc's old v1.x API (radians, azimuth from south); suncalc v2.x is a breaking
   rewrite (degrees, azimuth clockwise from north). Don't `npm install @types/suncalc` and trust
   it blindly — it's for the wrong major version.
-- **`src/irradiance.ts`** — pure, no three.js. Defines the `IrradianceProvider` interface
-  (`getIrradiance(altitudeDeg) -> { dni, dhi }`, in W/m^2) that all the radiation math below
-  depends on, plus `createClearSkyIrradianceProvider()`, a simple Meinel & Meinel-style clear-sky
-  approximation (DNI falls off with air-mass; DHI is a fixed fraction of DNI scaled by
-  sin(altitude)) — a deliberate **stand-in**, not real weather data. This app has no live data
-  source yet; real measured DNI/DHI (e.g. the Israel Meteorological Service's Envista API, Bet
-  Dagan station — needs a personal API token obtained directly from IMS, there's no self-serve
-  signup) is a planned follow-up. Because everything downstream only depends on the
-  `IrradianceProvider` interface, swapping in a real data-backed provider later is an isolated
-  change, not a rewrite. `computeUnshadedGHI(dni, dhi, sunDirY)` is the shared
-  `DNI*cos(incidence) + DHI` formula — for flat ground, cos(incidence) = sin(altitude) = sunDirY
-  exactly, so it needs no extra trig.
+- **`src/solarResourceData.ts`** — real long-term-average monthly DNI/DHI sums (kWh/m^2, 20-year
+  average 1999-2018) for **Zohar, Israel** (31.588056N, 34.706389E) — this app's actual EDF
+  Renewables project site — extracted from a Solargis solar-resource report (SG-63288-1906-7-1).
+  That report only contains monthly/yearly *summary* tables; the full hourly time series and TMY
+  (8760-hour typical-year) data it references are separate CSV files not yet available to this
+  project — swap this file's contents for real hourly/TMY figures once those arrive.
+- **`src/irradiance.ts`** — pure, no three.js beyond importing `getSunAngles` from
+  `sunPosition.ts` (a plain-object-returning function; same reasoning as `shadeAnalysis.ts`'s
+  import of it). Defines the `IrradianceProvider` interface
+  (`getIrradiance(altitudeDeg, month) -> { dni, dhi }`, in W/m^2, month 1-indexed) that all the
+  radiation math below depends on. Two implementations:
+  - `createClearSkyIrradianceProvider()` — a simple Meinel & Meinel-style clear-sky approximation
+    (DNI falls off with air-mass; DHI is a fixed fraction of DNI scaled by sin(altitude)), ignoring
+    month entirely — a generic, **uncalibrated** stand-in.
+  - `createCalibratedClearSkyIrradianceProvider(latitude, longitude, dniMonthlyKWh, dhiMonthlyKWh)`
+    — scales the plain clear-sky provider's output by a per-month factor, computed once at
+    creation by numerically integrating its raw output across a representative (15th) day of each
+    month and comparing the result to that month's real average-daily total (from
+    `solarResourceData.ts`). Grounds the model's *magnitude* in real regional data instead of a
+    generic formula's arbitrary coefficients — still an approximation (monthly averages, one
+    representative day, not per-timestamp measurements), but meaningfully closer to reality than
+    the plain provider. `zoharIrradianceProvider` is the ready-made instance (calibrated against
+    Zohar's real data) that `main.ts` and `sunHoursReport.ts` both use.
+
+  This app still has no live, per-timestamp weather data source; real measured hourly/TMY figures
+  (once the CSV files referenced by the Solargis report are available) are a planned follow-up.
+  Because everything downstream only depends on the `IrradianceProvider` interface, swapping in a
+  real data-backed provider later is an isolated change, not a rewrite.
+  `computeUnshadedGHI(dni, dhi, sunDirY)` is the shared `DNI*cos(incidence) + DHI` formula — for
+  flat ground, cos(incidence) = sin(altitude) = sunDirY exactly, so it needs no extra trig.
 - **`src/groundRadiation.ts`** — pure, no three.js. `computeGroundRadiationGrid` computes ground
   radiation as a percentage of unshaded GHI on a fine (x, z) grid: sunlit points are always
   exactly 100% (DNI*cos(incidence)+DHI reduces to the unshaded GHI itself on flat ground), shaded
@@ -282,12 +300,17 @@ layout.
   primary ask).
 - Nominatim reverse-geocoding is a live network call; there's no offline fallback beyond a raw
   lat/lon label.
-- Ground radiation (`irradiance.ts`) uses a simplified clear-sky DNI/DHI model, not real weather
-  data — no cloud cover, aerosols, or humidity. Wiring in the Israel Meteorological Service's
-  Envista API (Bet Dagan station has measured direct/diffuse readings at 10-minute intervals) is
-  planned but blocked on obtaining a personal API token directly from IMS (no self-serve signup);
-  everything downstream only depends on the `IrradianceProvider` interface, so swapping it in
-  later is an isolated change.
+- Ground radiation (`irradiance.ts`) uses a clear-sky DNI/DHI model calibrated per-month against
+  real long-term-average monthly sums for Zohar (`solarResourceData.ts`) — better than a generic
+  uncalibrated formula, but still not real per-timestamp weather data: no cloud cover, no
+  day-to-day variation, no aerosols/humidity, and the calibration itself only integrates one
+  representative day per month. The Solargis report this data comes from references full
+  hourly/TMY CSV files that would fix this properly; those aren't available to the project yet.
+  Everything downstream only depends on the `IrradianceProvider` interface, so swapping in real
+  hourly/TMY data later is an isolated change. Separately, the Israel Meteorological Service's
+  Envista API (Bet Dagan station has measured direct/diffuse readings at 10-minute intervals)
+  would be an alternative real-time source, but needs a personal API token obtained directly from
+  IMS (no self-serve signup).
 - `public/edf-logo.svg` is downloaded from [Wikimedia Commons](https://upload.wikimedia.org/wikipedia/commons/3/30/EDF_Power_Solutions_Logo.svg),
   marked public-domain there as "only simple geometric shapes and text," but the file page
   notes the EDF Power Solutions name/mark itself may still be trademarked — this demo uses it
