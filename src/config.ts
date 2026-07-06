@@ -2,11 +2,9 @@
 // tweakable without touching any other file.
 
 export const location = {
-  // Zohar, Israel — the actual EDF Renewables project site this app models (per Solargis solar
-  // resource report SG-63288-1906-7-1, see solarResourceData.ts). Previously a placeholder Tel
-  // Aviv location; change freely if modeling a different site.
-  latitude: 31.588056,
-  longitude: 34.706389,
+  // Tel Aviv, Israel area — change freely.
+  latitude: 32.08,
+  longitude: 34.78,
 };
 
 // Fixed demo date (year/month/day only; time-of-day is driven by the slider).
