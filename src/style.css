@@ -290,9 +290,14 @@ canvas {
 
 .two-d-model-view {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
   width: 100%;
-  height: 100%;
+  /* Shrunk to the upper part of the screen (rather than the full viewport) and pushed to the top,
+     leaving room below for the same Cumulative Sun Hours matrix+graph panel report mode uses —
+     see main.ts's enterTwoDMode. A fixed pixel reservation rather than a percentage, so the
+     panel (roughly constant height regardless of window size) reliably fits underneath. */
+  height: calc(100% - 400px);
   /* Matches config.ts's scene.skyColor (0xaee2fb) for visual consistency with the 3D view. */
   background: #aee2fb;
 }

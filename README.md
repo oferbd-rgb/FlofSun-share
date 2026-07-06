@@ -225,20 +225,27 @@ the file operations npm needs. Work on a real local disk.
   4 panel segments: if it hits one, the ray is drawn only up to that point and its ground position
   is shaded dark; if it clears every panel, it's drawn all the way to the grass and that position
   is shaded light — so the grass strip doubles as this view's shadow map, at the same resolution as
-  the ray spacing. The whole ray family is anchored on a pivot at (field-center X, hub height) —
-  one ray's *undrawn, unblocked* line always passes exactly through that point — so as the sun
-  angle changes, the family visibly pivots around the tracker axis rather than appearing to drift
-  sideways. Rays are clipped to the sky region via an SVG `<clipPath>` so they never visually spill
-  onto the ground at shallow sun angles.
+  the ray spacing (`RAY_SPACING_M`, currently 0.2m — dense enough that a typical field renders a
+  couple hundred rays, still trivial for SVG). The whole ray family is anchored on a pivot at
+  (field-center X, hub height) — one ray's *undrawn, unblocked* line always passes exactly through
+  that point — so as the sun angle changes, the family visibly pivots around the tracker axis
+  rather than appearing to drift sideways. Rays are clipped to the sky region via an SVG
+  `<clipPath>` so they never visually spill onto the ground at shallow sun angles.
 
   `main.ts` swaps this in as a full replacement for the 3D canvas (hidden via `display:none`, and
   its render call skipped entirely while 2D mode is active) while leaving the geometry-control,
   location-picker, and time-control panels exactly where they are — those describe the same
-  underlying settings regardless of which view is showing. Mutually exclusive with the Cumulative
-  Sun Hours report mode (entering either one exits the other first), since both repurpose the same
-  main viewing area. Reads the live, rate-limited `lastRotationDeg` (not a separately computed
-  "ideal" angle), so the tracker's angle here always matches what's actually being rendered in the
-  3D view.
+  underlying settings regardless of which view is showing. The elevation view's CSS box is shrunk
+  to the upper part of the screen (`height: calc(100% - 400px)`, a fixed pixel reservation rather
+  than a percentage, so it reliably fits regardless of window size) so `main.ts`'s
+  `enterTwoDMode` can push a **second, separate instance** of `sunHoursReport.ts`'s
+  `createSunHoursPanel()` in underneath it — the exact same matrix+graph component the Cumulative
+  Sun Hours report uses, refreshed the same way (on `onGeometryChange`/`onStateChange` while 2D
+  mode is active). Mutually exclusive with the Cumulative Sun Hours report mode (entering either
+  one exits the other first), since both repurpose the same main viewing area and would otherwise
+  fight over which `SunHoursPanel` instance is live. Reads the live, rate-limited
+  `lastRotationDeg` (not a separately computed "ideal" angle), so the tracker's angle here always
+  matches what's actually being rendered in the 3D view.
 
 The demo tracker is configured as a **1P** (one module wide per row, portrait orientation)
 layout.

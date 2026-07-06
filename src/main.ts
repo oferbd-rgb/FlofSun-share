@@ -26,8 +26,10 @@ const readingsPanel = createReadingsPanel(app);
 // --- 2D model: a separate schematic elevation view (see twoDModel.ts) that replaces the 3D
 // canvas entirely while keeping the geometry-control, location-picker, and time-control panels in
 // their normal (uncompacted) positions — those describe the same underlying settings regardless
-// of which view is showing. Mutually exclusive with the Cumulative Sun Hours report mode, since
-// both repurpose the main viewing area.
+// of which view is showing. The elevation view itself is shrunk to the upper part of the screen
+// (see style.css) to make room for the same Cumulative Sun Hours matrix+graph panel report mode
+// uses, pushed in underneath it. Mutually exclusive with the Cumulative Sun Hours report mode,
+// since both repurpose the main viewing area.
 const twoDModelView = createTwoDModelView();
 app.appendChild(twoDModelView.element);
 
@@ -37,6 +39,10 @@ twoDModelButton.textContent = "2D model";
 app.appendChild(twoDModelButton);
 
 let twoDModeActive = false;
+// Reuses the same Cumulative Sun Hours panel component as the "report" mode below — a separate
+// instance (not shared with `sunHoursPanel`) since the two modes are mutually exclusive but each
+// needs its own live DOM element while active.
+let twoDSunHoursPanel: SunHoursPanel | null = null;
 
 function enterTwoDMode(): void {
   if (reportActive) exitReportMode();
@@ -45,6 +51,8 @@ function enterTwoDMode(): void {
   readingsPanel.element.style.display = "none";
   twoDModelView.setVisible(true);
   twoDModelButton.textContent = "Back to 3D model";
+  twoDSunHoursPanel = createSunHoursPanel();
+  app.appendChild(twoDSunHoursPanel.element);
 }
 
 function exitTwoDMode(): void {
@@ -53,6 +61,8 @@ function exitTwoDMode(): void {
   readingsPanel.element.style.display = "";
   twoDModelView.setVisible(false);
   twoDModelButton.textContent = "2D model";
+  twoDSunHoursPanel?.element.remove();
+  twoDSunHoursPanel = null;
 }
 
 twoDModelButton.addEventListener("click", () => {
@@ -165,9 +175,11 @@ onGeometryChange(() => {
     updateTopDownZoom();
     sunHoursPanel?.refresh();
   }
+  if (twoDModeActive) twoDSunHoursPanel?.refresh();
 });
 onStateChange(() => {
   if (reportActive) sunHoursPanel?.refresh();
+  if (twoDModeActive) twoDSunHoursPanel?.refresh();
 });
 
 let lastFrameTime = performance.now();
