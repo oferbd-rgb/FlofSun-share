@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { computeShadeMatrix } from "./shadeAnalysis";
-import { createClearSkyIrradianceProvider } from "./irradiance";
 
 const TEL_AVIV_SUMMER_SOLSTICE = { year: 2026, month: 6, day: 21 };
 
@@ -16,7 +15,6 @@ function baseParams() {
     rowSpacingM: 7.5,
     rowCount: 4,
     getTrackingModeAt: () => "track" as const,
-    irradianceProvider: createClearSkyIrradianceProvider(),
     xMin: -30,
     xMax: 30,
     xBucketCount: 60,
@@ -61,40 +59,5 @@ describe("computeShadeMatrix", () => {
     const result = computeShadeMatrix(baseParams());
     expect(result.xEdges[0]).toBeCloseTo(-30);
     expect(result.xEdges[result.xEdges.length - 1]).toBeCloseTo(30);
-  });
-
-  it("percentOfGHI is 0 whenever the sun is below the horizon", () => {
-    const result = computeShadeMatrix(baseParams());
-    result.sunUp.forEach((up, i) => {
-      if (!up) {
-        expect(result.percentOfGHI[i].every((cell) => cell === 0)).toBe(true);
-      }
-    });
-  });
-
-  it("percentOfGHI is exactly 100 wherever shaded is false", () => {
-    const result = computeShadeMatrix(baseParams());
-    result.shaded.forEach((row, ti) => {
-      row.forEach((isShaded, xi) => {
-        if (!isShaded && result.sunUp[ti]) {
-          expect(result.percentOfGHI[ti][xi]).toBe(100);
-        }
-      });
-    });
-  });
-
-  it("percentOfGHI is strictly between 0 and 100 wherever shaded is true", () => {
-    const result = computeShadeMatrix(baseParams());
-    let sawShadedPoint = false;
-    result.shaded.forEach((row, ti) => {
-      row.forEach((isShaded, xi) => {
-        if (isShaded) {
-          sawShadedPoint = true;
-          expect(result.percentOfGHI[ti][xi]).toBeGreaterThan(0);
-          expect(result.percentOfGHI[ti][xi]).toBeLessThan(100);
-        }
-      });
-    });
-    expect(sawShadedPoint).toBe(true);
   });
 });

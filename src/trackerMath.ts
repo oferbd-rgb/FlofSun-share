@@ -122,29 +122,6 @@ export function computeFieldHalfWidthM(rowCount: number, rowSpacingM: number): n
   return ((rowCount - 1) / 2) * rowSpacingM + rowSpacingM;
 }
 
-// World X position of each row's torque-tube center, evenly spaced and centered on X=0 — the
-// same formula scene.ts's rebuildRows uses to place each TrackerRow, and shadeAnalysis.ts /
-// groundRadiation.ts both need it too (for shadow and view-factor math respectively).
-export function computeRowWorldXPositions(rowCount: number, rowSpacingM: number): number[] {
-  const positions: number[] = [];
-  for (let i = 0; i < rowCount; i++) {
-    positions.push((i - (rowCount - 1) / 2) * rowSpacingM);
-  }
-  return positions;
-}
-
-// How far (m, along the row's own Z/length axis) the row's ground shadow shifts from directly
-// below the row, due to the sun's north-south direction component. Rotation is always about the
-// row's own Z axis (see tracker.ts), so a row's Z-extent never changes with tilt — only this
-// hub-height-driven shift moves the shadow's Z-range away from the row's own [-halfLength,
-// +halfLength]. Approximates the whole row as occurring at a single height (hubHeightM), ignoring
-// the small extra Z-spread the panel's own tilt-driven height variation would add — a second-order
-// effect, similar in spirit to computeShadowFootprintWidthM's existing hub-height simplification.
-export function computeRowShadowZShift(hubHeightM: number, sunDirZ: number, sunDirY: number): number {
-  if (sunDirY <= 0) return 0;
-  return (hubHeightM / sunDirY) * sunDirZ;
-}
-
 // "Anti-tracking": instead of facing the sun (computeTrackerRotationDeg), rotate 90deg off
 // that angle — to whichever side (east, i.e. -90, or west, i.e. +90) yields the smaller
 // shadow footprint once clamped to the mechanical limit. A literal 90deg offset usually

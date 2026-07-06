@@ -75,9 +75,6 @@ the file operations npm needs. Work on a real local disk.
     drives to one of the two mechanical end-stops) toward whichever side — east or west — casts
     the smaller shadow, per `computeShadowFootprintWidthM`'s east-west shadow-edge projection
     for that candidate angle and the current sun direction.
-  - `computeFieldHalfWidthM`, `computeRowWorldXPositions`, `computeRowShadowZShift` — small shared
-    geometry helpers used by `shadeAnalysis.ts`, `groundRadiation.ts`, and `main.ts`'s top-down
-    report camera, so the row layout and shadow math stay in exactly one place.
   - `stepTowardDeg` — models a tracker motor's maximum slew rate
     (`tracker.maxRotationSpeedDegPerMin`, config.ts): moves the actual applied rotation toward
     whichever target is currently active (tracking or anti-tracking) by at most that much,
@@ -161,101 +158,29 @@ the file operations npm needs. Work on a real local disk.
   reflects suncalc's old v1.x API (radians, azimuth from south); suncalc v2.x is a breaking
   rewrite (degrees, azimuth clockwise from north). Don't `npm install @types/suncalc` and trust
   it blindly — it's for the wrong major version.
-- **`src/solarResourceData.ts`** — real long-term-average monthly DNI/DHI sums (kWh/m^2, 20-year
-  average 1999-2018) for **Zohar, Israel** (31.588056N, 34.706389E) — this app's actual EDF
-  Renewables project site — extracted from a Solargis solar-resource report (SG-63288-1906-7-1).
-  That report only contains monthly/yearly *summary* tables; the full hourly time series and TMY
-  (8760-hour typical-year) data it references are separate CSV files not yet available to this
-  project — swap this file's contents for real hourly/TMY figures once those arrive.
-- **`src/irradiance.ts`** — pure, no three.js beyond importing `getSunAngles` from
-  `sunPosition.ts` (a plain-object-returning function; same reasoning as `shadeAnalysis.ts`'s
-  import of it). Defines the `IrradianceProvider` interface
-  (`getIrradiance(altitudeDeg, month) -> { dni, dhi }`, in W/m^2, month 1-indexed) that all the
-  radiation math below depends on. Two implementations:
-  - `createClearSkyIrradianceProvider()` — a simple Meinel & Meinel-style clear-sky approximation
-    (DNI falls off with air-mass; DHI is a fixed fraction of DNI scaled by sin(altitude)), ignoring
-    month entirely — a generic, **uncalibrated** stand-in.
-  - `createCalibratedClearSkyIrradianceProvider(latitude, longitude, dniMonthlyKWh, dhiMonthlyKWh)`
-    — scales the plain clear-sky provider's output by a per-month factor, computed once at
-    creation by numerically integrating its raw output across a representative (15th) day of each
-    month and comparing the result to that month's real average-daily total (from
-    `solarResourceData.ts`). Grounds the model's *magnitude* in real regional data instead of a
-    generic formula's arbitrary coefficients — still an approximation (monthly averages, one
-    representative day, not per-timestamp measurements), but meaningfully closer to reality than
-    the plain provider. `zoharIrradianceProvider` is the ready-made instance (calibrated against
-    Zohar's real data) that `main.ts` and `sunHoursReport.ts` both use.
-
-  This app still has no live, per-timestamp weather data source; real measured hourly/TMY figures
-  (once the CSV files referenced by the Solargis report are available) are a planned follow-up.
-  Because everything downstream only depends on the `IrradianceProvider` interface, swapping in a
-  real data-backed provider later is an isolated change, not a rewrite.
-  `computeUnshadedGHI(dni, dhi, sunDirY)` is the shared `DNI*cos(incidence) + DHI` formula — for
-  flat ground, cos(incidence) = sin(altitude) = sunDirY exactly, so it needs no extra trig.
-- **`src/groundRadiation.ts`** — pure, no three.js. `computeGroundRadiationGrid` computes ground
-  radiation as a percentage of unshaded GHI on a fine (x, z) grid: sunlit points are always
-  exactly 100% (DNI*cos(incidence)+DHI reduces to the unshaded GHI itself on flat ground), shaded
-  points get `viewFactorToSky * DHI` only (direct beam blocked, just the visible slice of sky's
-  diffuse light reaches them). The view factor itself
-  (`computeViewFactorToSkyInterior`, exported for `shadeAnalysis.ts`'s reuse) comes from a classic
-  2D radiative-transfer result: for a Lambertian ground point, the view factor to any angular
-  slice of sky is linear in sin(phi) (phi measured from zenith), so each row's blocked angular
-  span becomes an interval in "sin-space" over [-1, 1], and the blocked fraction is just the
-  length of the UNION of those intervals (merged to avoid double-counting overlapping rows)
-  divided by 2. This treats each row as an infinitely long tilted strip — exact deep within a
-  row's own physical length, since the rows only rotate about their own Z axis (see `tracker.ts`),
-  making the whole pattern Z-invariant there. Near a row's actual Z-ends, where a ground point can
-  "see past" the row's finite length, `computeGroundRadiationGrid` instead calls
-  `viewFactorToSkyFinite`, which numerically integrates the point-to-panel solid-angle blockage
-  over a small (12x12) patch grid — the standard `cos(theta_point)*cos(theta_patch)*dA/(pi*r^2)`
-  formula, both cosines needed (the receiving point's own Lambertian response, and the tilted
-  patch's foreshortening). Performance: the fast interior formula is computed **once** per
-  distinct case (shaded vs not) and reused across every interior Z row rather than recomputed per
-  grid point — only the (few) Z-slices within `edgeMarginM` of a row's real ends pay for the
-  slower per-point numerical treatment. `computeRowLengthM` is the row's fixed physical length
-  (config-derived, not user-adjustable).
-- **`src/groundRadiationOverlay.ts`** — a ground-hugging, unlit (`MeshBasicMaterial`) plane
-  textured from a `CanvasTexture`, repainted via raw `ImageData` (not per-cell `fillRect` calls —
-  far faster at tens of thousands of cells) every time `update()` gets a fresh
-  `computeGroundRadiationGrid` result. Same two-stop color gradient (dark indigo -> warm yellow)
-  as the Cumulative Sun Hours report's heatmap, so the two visualizations read consistently.
-  Canvas row 0 maps to `grid.zCenters[0]` with no vertical flip needed — verified directly
-  (`Vector3.project(camera)` against the grid's own indexing) rather than reasoned out purely on
-  paper, since `CanvasTexture`'s default `flipY` combined with this mesh's -90deg X rotation put
-  local +Y (V=1, canvas row 0) at world **-Z**, which happens to match `zCenters`' ascending
-  order — a coincidence of this specific rotation, not something to assume holds for a
-  differently-oriented mesh.
 - **`src/shadeAnalysis.ts`** — pure (no three.js — recomputes the sun direction's X/Y components
   inline rather than importing `sunAzElToVector3`, same reasoning as `trackerMath.ts`),
-  independently testable: `computeShadeMatrix` builds the "Cumulative sunhours" report's ground
-  heatmap by sampling the day at a fixed interval and, for each sample, using the *deterministic*
-  tracking/anti-tracking angle (same formulas as `main.ts`'s render loop, but **not** the live
-  rate-limited rotation — the report describes a fixed, reproducible outcome for the current
-  settings, not a snapshot of in-progress animation) to compute each row's ground shadow interval
-  (`trackerMath.ts`'s `computeRowShadowIntervalX`, which — unlike `computeShadowFootprintWidthM`
-  — keeps hub height and row position rather than only measuring shadow *width*, so it can place
-  the shadow in absolute ground coordinates). Alongside the binary `shaded` matrix, it also
-  returns `percentOfGHI` — reusing `groundRadiation.ts`'s `computeViewFactorToSkyInterior` (this
-  report's 1D cross-section is, itself, always a "deep interior" slice at Z=0, so the same
-  infinite-strip formula applies directly, no finite-edge correction needed here) and an injected
-  `IrradianceProvider` to turn shading into an actual radiation percentage rather than a plain
-  boolean.
+  independently testable: `computeShadeMatrix` builds the "Cumulative sunhours" report's
+  ground-shading heatmap by sampling the day at a fixed interval and, for each sample, using the
+  *deterministic* tracking/anti-tracking angle (same formulas as `main.ts`'s render loop, but
+  **not** the live rate-limited rotation — the report describes a fixed, reproducible outcome
+  for the current settings, not a snapshot of in-progress animation) to compute each row's ground
+  shadow interval (`trackerMath.ts`'s `computeRowShadowIntervalX`, which — unlike
+  `computeShadowFootprintWidthM` — keeps hub height and row position rather than only measuring
+  shadow *width*, so it can place the shadow in absolute ground coordinates).
 - **`src/sunHoursReport.ts`** — no longer a separate full-screen page. `createSunHoursPanel`
   builds a small overlay panel that sits alongside the *live* 3D scene rather than hiding it,
   kept deliberately short (1px-tall heatmap rows, trimmed padding) so the top-down 3D view stays
   visible above it. It has no fixed-data text summary — date and the tracking/anti-tracking
   schedule are shown live by the (trimmed) time-control bar instead, see below. Contents: a
-  canvas-rendered continuous radiation-percentage heatmap from `computeShadeMatrix`'s
-  `percentOfGHI` (X = ground east-west position, Y = time of day; same dark-indigo-to-yellow
-  gradient as `groundRadiationOverlay.ts`'s live 3D overlay, so the two read consistently — this
-  replaced an earlier binary grey/green "shaded or not" version once the view-factor math existed
-  to show a real percentage instead), two draggable horizontal lines overlaid directly on the
-  matrix (`attachRangeHandle` — plain pointer-event dragging, not native range inputs, so each
-  line can render as a full-width bar with its own floating time label in the y-axis gutter,
-  dragged with the mouse rather than a side-to-side slider) that define the [start, end)
-  time-of-day window, and a filled line-chart graph below showing cumulative *effective* sun-hours
-  per x-position (`computeSunHoursByX` sums `percentOfGHI/100 * timeStepHours`, not a plain
-  binary sunlit-hour count, so a partially-shaded point counts for a fraction of an hour) summed
-  over exactly that window. The heatmap/graph canvas is a fixed `HEATMAP_CANVAS_WIDTH_PX` (810px —
+  canvas-rendered binary grey/green heatmap from `computeShadeMatrix` (X = ground east-west
+  position, Y = time of day, grey covers both "shaded by a row" and "night"), two draggable
+  horizontal lines overlaid directly on the matrix (`attachRangeHandle` — plain pointer-event
+  dragging, not native range inputs, so each line can render as a full-width bar with its own
+  floating time label in the y-axis gutter, dragged with the mouse rather than a side-to-side
+  slider) that define the [start, end) time-of-day window, and a filled line-chart graph below
+  showing cumulative sun-hours per x-position summed over exactly that window
+  (`computeSunHoursByX`). The heatmap/graph canvas is a fixed `HEATMAP_CANVAS_WIDTH_PX` (810px —
   90 x-buckets at 9px each) and is centered under the panel independent of the y-axis label
   gutter (`.sun-hours-heatmap-wrap` in style.css: `width: fit-content; margin: 0 auto`, with the
   gutter absolutely positioned outside that box) so its horizontal center always lands on the
@@ -300,17 +225,6 @@ layout.
   primary ask).
 - Nominatim reverse-geocoding is a live network call; there's no offline fallback beyond a raw
   lat/lon label.
-- Ground radiation (`irradiance.ts`) uses a clear-sky DNI/DHI model calibrated per-month against
-  real long-term-average monthly sums for Zohar (`solarResourceData.ts`) — better than a generic
-  uncalibrated formula, but still not real per-timestamp weather data: no cloud cover, no
-  day-to-day variation, no aerosols/humidity, and the calibration itself only integrates one
-  representative day per month. The Solargis report this data comes from references full
-  hourly/TMY CSV files that would fix this properly; those aren't available to the project yet.
-  Everything downstream only depends on the `IrradianceProvider` interface, so swapping in real
-  hourly/TMY data later is an isolated change. Separately, the Israel Meteorological Service's
-  Envista API (Bet Dagan station has measured direct/diffuse readings at 10-minute intervals)
-  would be an alternative real-time source, but needs a personal API token obtained directly from
-  IMS (no self-serve signup).
 - `public/edf-logo.svg` is downloaded from [Wikimedia Commons](https://upload.wikimedia.org/wikipedia/commons/3/30/EDF_Power_Solutions_Logo.svg),
   marked public-domain there as "only simple geometric shapes and text," but the file page
   notes the EDF Power Solutions name/mark itself may still be trademarked — this demo uses it

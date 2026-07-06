@@ -268,31 +268,6 @@ canvas {
   border-color: var(--accent);
 }
 
-.ground-radiation-toggle-button {
-  position: fixed;
-  bottom: 70px;
-  right: 20px;
-  padding: 10px 16px;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: var(--panel-radius);
-  box-shadow: var(--panel-shadow);
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  backdrop-filter: blur(10px);
-}
-
-.ground-radiation-toggle-button:hover {
-  border-color: var(--accent);
-}
-
-.ground-radiation-toggle-button.is-active {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
 .sun-hours-panel {
   position: fixed;
   left: 50%;
@@ -433,11 +408,24 @@ canvas {
   color: var(--text-muted);
 }
 
-.sun-hours-legend-gradient {
+.sun-hours-legend-swatch {
   display: inline-block;
-  width: 120px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
   border-radius: 3px;
-  background: linear-gradient(to right, rgb(30, 30, 70), rgb(255, 210, 60));
+  margin-left: 12px;
+  margin-right: 4px;
   vertical-align: middle;
+}
+
+.sun-hours-legend-swatch:first-child {
+  margin-left: 0;
+}
+
+.sun-hours-legend-green {
+  background: #3ba55c;
+}
+
+.sun-hours-legend-grey {
+  background: #6b7280;
 }
