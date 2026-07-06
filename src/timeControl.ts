@@ -1,11 +1,25 @@
 import { animation } from "./config";
-import { getDate, setDate, type DateState } from "./appState";
+import {
+  getDate,
+  getTrackingSchedule,
+  minutesToIntervalIndex,
+  setDate,
+  setTrackingIntervalMode,
+  type DateState,
+} from "./appState";
 import type { DaylightBounds } from "./sunPosition";
 
 export interface TimeControl {
+  element: HTMLElement;
   getMinutesSinceMidnight(): number;
   advance(realDeltaSeconds: number): void;
   updateBounds(bounds: DaylightBounds): void;
+  pause(): void;
+  // Hides the momentary/instantaneous controls (play, speed, scrub slider, clock) while keeping
+  // the date input and the tracking/anti-tracking schedule bar visible — used while the
+  // Cumulative Sun Hours report is open, since a full-day report has no "current moment" but
+  // still depends on which date and which schedule are in effect.
+  setCompact(compact: boolean): void;
 }
 
 function formatClock(minutes: number): string {
@@ -21,6 +35,60 @@ function toIsoDate({ year, month, day }: DateState): string {
 function parseIsoDate(iso: string): DateState {
   const [year, month, day] = iso.split("-").map(Number);
   return { year, month, day };
+}
+
+interface ScheduleBar {
+  element: HTMLElement;
+  updateBounds(bounds: DaylightBounds): void;
+}
+
+// One clickable segment per half-hour, positioned/sized (via absolute percentage left/width) to
+// line up with the slider directly above it: the bar always spans exactly
+// [bounds.sunriseMinutes, bounds.sunsetMinutes], same as the slider's own min/max, rather than a
+// fixed 00:00-24:00 range. A half-hour interval that only partially overlaps the bounds (at
+// either end) is clipped to show just its overlapping portion, so the bar's edges land exactly
+// under the slider's own left/right ends. The underlying schedule storage is still the fixed
+// 48-slot 00:00-24:00 clock (see appState.ts) — only the rendering here is bounds-relative.
+function createScheduleBar(): ScheduleBar {
+  const bar = document.createElement("div");
+  bar.className = "tracking-schedule-bar";
+
+  function render(bounds: DaylightBounds): void {
+    bar.replaceChildren();
+    const totalRangeMinutes = bounds.sunsetMinutes - bounds.sunriseMinutes;
+    if (totalRangeMinutes <= 0) return;
+
+    const firstIntervalStart = Math.floor(bounds.sunriseMinutes / 30) * 30;
+    for (let intervalStart = firstIntervalStart; intervalStart < bounds.sunsetMinutes; intervalStart += 30) {
+      const intervalEnd = intervalStart + 30;
+      const clippedStart = Math.max(intervalStart, bounds.sunriseMinutes);
+      const clippedEnd = Math.min(intervalEnd, bounds.sunsetMinutes);
+      if (clippedEnd <= clippedStart) continue;
+
+      const scheduleIndex = minutesToIntervalIndex(intervalStart);
+      const segment = document.createElement("div");
+      segment.className = "tracking-schedule-segment";
+      segment.style.left = `${((clippedStart - bounds.sunriseMinutes) / totalRangeMinutes) * 100}%`;
+      segment.style.width = `${((clippedEnd - clippedStart) / totalRangeMinutes) * 100}%`;
+
+      const startLabel = formatClock(intervalStart);
+      const endLabel = formatClock(intervalEnd);
+      const refreshSegment = () => {
+        const isAntiTracking = getTrackingSchedule()[scheduleIndex] === "anti-track";
+        segment.classList.toggle("is-anti-tracking", isAntiTracking);
+        segment.title = `${startLabel}-${endLabel}: ${isAntiTracking ? "anti-tracking" : "tracking"} (click to toggle)`;
+      };
+      segment.addEventListener("click", () => {
+        const current = getTrackingSchedule()[scheduleIndex];
+        setTrackingIntervalMode(scheduleIndex, current === "track" ? "anti-track" : "track");
+        refreshSegment();
+      });
+      refreshSegment();
+      bar.appendChild(segment);
+    }
+  }
+
+  return { element: bar, updateBounds: render };
 }
 
 export function createTimeControl(container: HTMLElement, initialBounds: DaylightBounds): TimeControl {
@@ -42,6 +110,23 @@ export function createTimeControl(container: HTMLElement, initialBounds: Dayligh
 
   const playButton = document.createElement("button");
   playButton.textContent = "Play";
+
+  // Speed multiple of the 1x base rate (animation.simMinutesPerRealSecond = 1 simulated hour
+  // per 2 real seconds) — rounded, easy-to-reason-about options rather than a continuous slider.
+  let speedMultiplier = animation.defaultSpeedMultiplier;
+  const speedSelect = document.createElement("select");
+  speedSelect.className = "speed-select";
+  for (const option of animation.speedOptions) {
+    const optionEl = document.createElement("option");
+    optionEl.value = String(option);
+    optionEl.textContent = `${option}x`;
+    speedSelect.appendChild(optionEl);
+  }
+  speedSelect.value = String(speedMultiplier);
+  speedSelect.title = "Playback speed (1x = 1 simulated hour per 2 real seconds)";
+  speedSelect.addEventListener("change", () => {
+    speedMultiplier = Number(speedSelect.value);
+  });
 
   const slider = document.createElement("input");
   slider.type = "range";
@@ -72,9 +157,18 @@ export function createTimeControl(container: HTMLElement, initialBounds: Dayligh
     refreshDisplay();
   });
 
+  const scheduleBar = createScheduleBar();
+  scheduleBar.updateBounds(bounds);
+
+  const sliderStack = document.createElement("div");
+  sliderStack.className = "time-control-slider-stack";
+  sliderStack.appendChild(slider);
+  sliderStack.appendChild(scheduleBar.element);
+
   panel.appendChild(dateInput);
   panel.appendChild(playButton);
-  panel.appendChild(slider);
+  panel.appendChild(speedSelect);
+  panel.appendChild(sliderStack);
   panel.appendChild(clockReadout);
   panel.appendChild(tzNote);
   container.appendChild(panel);
@@ -82,12 +176,25 @@ export function createTimeControl(container: HTMLElement, initialBounds: Dayligh
   refreshDisplay();
 
   return {
+    element: panel,
     getMinutesSinceMidnight() {
       return minutesSinceMidnight;
     },
+    pause() {
+      playing = false;
+      playButton.textContent = "Play";
+    },
+    setCompact(compact: boolean) {
+      const hiddenDisplay = compact ? "none" : "";
+      playButton.style.display = hiddenDisplay;
+      speedSelect.style.display = hiddenDisplay;
+      slider.style.display = hiddenDisplay;
+      clockReadout.style.display = hiddenDisplay;
+      tzNote.style.display = hiddenDisplay;
+    },
     advance(realDeltaSeconds: number) {
       if (!playing) return;
-      minutesSinceMidnight += realDeltaSeconds * animation.simMinutesPerRealSecond;
+      minutesSinceMidnight += realDeltaSeconds * animation.simMinutesPerRealSecond * speedMultiplier;
       if (minutesSinceMidnight > bounds.sunsetMinutes) {
         minutesSinceMidnight = bounds.sunriseMinutes;
       }
@@ -97,6 +204,7 @@ export function createTimeControl(container: HTMLElement, initialBounds: Dayligh
       bounds = newBounds;
       slider.min = String(bounds.sunriseMinutes);
       slider.max = String(bounds.sunsetMinutes);
+      scheduleBar.updateBounds(bounds);
       if (minutesSinceMidnight < bounds.sunriseMinutes || minutesSinceMidnight > bounds.sunsetMinutes) {
         minutesSinceMidnight = (bounds.sunriseMinutes + bounds.sunsetMinutes) / 2;
       }

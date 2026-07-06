@@ -4,6 +4,17 @@
   box-sizing: border-box;
 }
 
+:root {
+  --panel-bg: linear-gradient(160deg, rgba(32, 38, 50, 0.95), rgba(15, 18, 25, 0.95));
+  --panel-border: rgba(255, 255, 255, 0.09);
+  --panel-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --panel-radius: 12px;
+  --accent: #4fd1c5;
+  --text-primary: #edf1f6;
+  --text-muted: #99a3b3;
+  --mono-font: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
 html,
 body,
 #app {
@@ -48,14 +59,30 @@ canvas {
   background: #38405a;
 }
 
+.speed-select {
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: #2a3040;
+  color: #f0f0f0;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+}
+
 .time-control input[type="range"] {
   width: 320px;
+}
+
+.time-control-slider-stack {
+  display: flex;
+  flex-direction: column;
 }
 
 .clock-readout {
   min-width: 3.5em;
   font-variant-numeric: tabular-nums;
-  font-size: 15px;
+  font-size: 30px;
 }
 
 .tz-note {
@@ -99,4 +126,340 @@ canvas {
   margin-top: 8px;
   font-size: 13px;
   color: #d5d8e0;
+}
+
+.geometry-control {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 210px;
+  padding: 14px 16px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  box-shadow: var(--panel-shadow);
+  color: var(--text-primary);
+  backdrop-filter: blur(10px);
+}
+
+.geometry-control-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.geometry-control-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.geometry-control-row input {
+  width: 72px;
+  padding: 4px 7px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-family: var(--mono-font);
+  text-align: right;
+}
+
+.geometry-control-row input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.tracking-schedule-bar {
+  position: relative;
+  width: 320px;
+  height: 16px;
+  margin-top: 6px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.tracking-schedule-segment {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: #2a8f8f;
+  cursor: pointer;
+  box-sizing: border-box;
+  border-left: 1px solid rgba(0, 0, 0, 0.25);
+}
+
+.tracking-schedule-segment:hover {
+  filter: brightness(1.25);
+}
+
+.tracking-schedule-segment.is-anti-tracking {
+  background: #b5641f;
+}
+
+.readings-panel {
+  position: fixed;
+  /* Clears above .time-control (bottom:24px, ~60-90px tall) rather than sitting flush at the
+     very bottom-left pixel — .time-control is horizontally centered and wide enough (~800px)
+     to overlap a corner-anchored panel at common desktop viewport widths (~1280-1440px) if
+     they share the same vertical band. */
+  bottom: 100px;
+  left: 20px;
+  display: grid;
+  grid-template-columns: auto auto;
+  column-gap: 28px;
+  row-gap: 6px;
+  padding: 14px 18px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  box-shadow: var(--panel-shadow);
+  color: var(--text-primary);
+  backdrop-filter: blur(10px);
+}
+
+.readings-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.readings-value {
+  font-size: 13.5px;
+  font-family: var(--mono-font);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.sun-hours-trigger-button {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 10px 16px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  box-shadow: var(--panel-shadow);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+}
+
+.sun-hours-trigger-button:hover {
+  border-color: var(--accent);
+}
+
+.two-d-model-toggle-button {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  padding: 10px 16px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  box-shadow: var(--panel-shadow);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+}
+
+.two-d-model-toggle-button:hover {
+  border-color: var(--accent);
+}
+
+.two-d-model-view {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  /* Shrunk to the upper part of the screen (rather than the full viewport) and pushed to the top,
+     leaving room below for the same Cumulative Sun Hours matrix+graph panel report mode uses —
+     see main.ts's enterTwoDMode. A fixed pixel reservation rather than a percentage, so the
+     panel (roughly constant height regardless of window size) reliably fits underneath. */
+  height: calc(100% - 400px);
+  /* Matches config.ts's scene.skyColor (0xaee2fb) for visual consistency with the 3D view. */
+  background: #aee2fb;
+}
+
+.sun-hours-panel {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  /* Fixed rather than auto/fit-content: the canvas (810px, see sunHoursReport.ts's
+     HEATMAP_CANVAS_WIDTH_PX) plus its y-axis gutter (46px) needs to sit exactly centered under
+     this panel's own center, since main.ts zooms the top-down 3D camera to match that same
+     canvas width — an auto-sized panel could let the title/legend text push it wider and throw
+     that alignment off. */
+  width: 900px;
+  padding: 10px 18px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  box-shadow: var(--panel-shadow);
+  color: var(--text-primary);
+  backdrop-filter: blur(10px);
+}
+
+.sun-hours-panel-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  padding-bottom: 4px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.sun-hours-graph-canvas {
+  display: block;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Each block (matrix, graph) sizes to exactly its canvas's width and centers that within the
+   panel — the y-axis label gutter and the drag-handle lines are positioned absolutely, outside
+   this box, so they don't push its width (and therefore its centering) off the canvas's own. */
+.sun-hours-heatmap-wrap {
+  position: relative;
+  width: fit-content;
+  margin: 0 auto;
+}
+
+.sun-hours-axis-y {
+  position: absolute;
+  top: 0;
+  right: 100%;
+  width: 40px;
+  margin-right: 6px;
+}
+
+.sun-hours-axis-y span {
+  position: absolute;
+  right: 0;
+  transform: translateY(-50%);
+  font-size: 11px;
+  font-family: var(--mono-font);
+  color: var(--text-muted);
+}
+
+.sun-hours-heatmap-canvas-wrap {
+  position: relative;
+  padding-bottom: 16px;
+}
+
+/* A draggable horizontal line overlaid directly on the heatmap matrix, spanning from the y-axis
+   label gutter across the full canvas width — dragging it up/down (see sunHoursReport.ts's
+   attachRangeHandle) redefines the start/end of the summed time-of-day window. The floating
+   time label lives in the gutter, right where the hour-of-day axis labels are, so the currently
+   selected boundary reads directly against them. */
+.sun-hours-range-handle {
+  position: absolute;
+  left: -46px;
+  right: 0;
+  height: 11px;
+  margin-top: -5px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.sun-hours-range-handle::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 5px;
+  height: 2px;
+  background: var(--accent);
+}
+
+.sun-hours-range-handle:hover::before,
+.sun-hours-range-handle.is-dragging::before {
+  height: 3px;
+  top: 4px;
+  background: #7fe8dc;
+}
+
+.sun-hours-range-handle-label {
+  position: absolute;
+  left: 0;
+  top: -3px;
+  width: 40px;
+  font-size: 10px;
+  font-family: var(--mono-font);
+  color: var(--accent);
+  text-align: right;
+  pointer-events: none;
+}
+
+.sun-hours-heatmap-canvas {
+  display: block;
+  border-radius: 4px;
+}
+
+.sun-hours-axis-x {
+  position: relative;
+  height: 16px;
+}
+
+.sun-hours-axis-x span {
+  position: absolute;
+  top: 2px;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-family: var(--mono-font);
+  color: var(--text-muted);
+}
+
+.sun-hours-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.sun-hours-legend-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  margin-left: 12px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.sun-hours-legend-swatch:first-child {
+  margin-left: 0;
+}
+
+.sun-hours-legend-green {
+  background: #3ba55c;
+}
+
+.sun-hours-legend-grey {
+  background: #6b7280;
 }

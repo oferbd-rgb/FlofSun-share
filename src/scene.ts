@@ -1,4 +1,6 @@
 import {
+  Color,
+  CylinderGeometry,
   HemisphereLight,
   Mesh,
   MeshStandardMaterial,
@@ -9,9 +11,13 @@ import {
   WebGLRenderer,
 } from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { scene as sceneCfg, tracker as trackerCfg } from "./config";
+import { billboards as billboardCfg, scene as sceneCfg, shadeLine as shadeLineCfg, tracker as trackerCfg } from "./config";
+import { getDate, getLocation, getTrackerGeometry, onGeometryChange, onStateChange } from "./appState";
+import { createBillboard, loadLogoImage } from "./billboard";
 import { addCompassLabels } from "./compassLabels";
+import { createGroundTexture } from "./groundTexture";
 import { createSunLightRig, type SunLightRig } from "./sunLight";
+import { createSunPath } from "./sunPath";
 import { createTrackerRow, type TrackerRow } from "./tracker";
 import { addTrees } from "./trees";
 
@@ -26,27 +32,91 @@ export interface AppScene {
 
 export function createAppScene(canvasContainer: HTMLElement): AppScene {
   const scene = new Scene();
+  scene.background = new Color(sceneCfg.skyColor);
 
   const ground = new Mesh(
     new PlaneGeometry(sceneCfg.groundSize, sceneCfg.groundSize),
-    new MeshStandardMaterial({ color: 0x4a5d3a }),
+    new MeshStandardMaterial({ map: createGroundTexture(), roughness: 0.95 }),
   );
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   scene.add(ground);
+
+  // Silver east-west reference strip — a ruler for gauging tracker shadow position/length at a
+  // glance, even in a single still frame. Half-cylinder (flat/open face down, dome up) rather
+  // than a flat plane so it catches highlights from a range of observation angles instead of
+  // only reflecting strongly from directly overhead.
+  const shadeLineRadius = shadeLineCfg.widthM / 2;
+  const shadeLine = new Mesh(
+    // CylinderGeometry's local vertices are (r*sin(theta), y, r*cos(theta)) — not (r*cos, r*sin)
+    // as the naming suggests (verified directly against the actual BufferGeometry data, since
+    // guessing this convention wrong once already silently produced a sideways-bulging shape).
+    // thetaStart=0, thetaLength=PI sweeps theta in [0,PI], where sin(theta) >= 0 throughout, so
+    // local X >= 0 always; after the Y->X axis rotation below (local X becomes world Y), that
+    // sits at world Y >= 0 (the dome), leaving the flat open side down at the ground.
+    new CylinderGeometry(shadeLineRadius, shadeLineRadius, sceneCfg.groundSize, 24, 1, true, 0, Math.PI),
+    new MeshStandardMaterial({ color: shadeLineCfg.color, roughness: 0.3, metalness: 0.5 }),
+  );
+  shadeLine.rotation.z = Math.PI / 2; // cylinder axis Y -> X (runs east-west)
+  shadeLine.position.set(0, -0.02, shadeLineCfg.worldZ); // embed slightly so the base edge doesn't z-fight the ground
+  shadeLine.receiveShadow = true;
+  scene.add(shadeLine);
 
   scene.add(new HemisphereLight(0xbfd8ff, 0x3a3a2a, 0.6));
   const sunLightRig = createSunLightRig(scene);
   addCompassLabels(scene);
   addTrees(scene);
 
+  const initialLocation = getLocation();
+  const sunPath = createSunPath(getDate(), initialLocation.latitude, initialLocation.longitude, sceneCfg.sunMarkerDistance);
+  scene.add(sunPath.line);
+  onStateChange(() => {
+    const loc = getLocation();
+    sunPath.update(getDate(), loc.latitude, loc.longitude, sceneCfg.sunMarkerDistance);
+  });
+
+  loadLogoImage(billboardCfg.logoUrl).then((logoImage) => {
+    for (const sign of billboardCfg.signs) {
+      const billboard = createBillboard({
+        worldX: sign.worldX,
+        worldZ: sign.worldZ,
+        facingAzimuthDeg: sign.facingAzimuthDeg,
+        widthM: billboardCfg.widthM,
+        heightM: billboardCfg.heightM,
+        hoverHeightM: billboardCfg.hoverHeightM,
+        logoImage,
+      });
+      scene.add(billboard);
+    }
+  });
+
+  // Kept as a stable array reference (mutated in place by rebuildRows) rather than reassigned,
+  // so callers that destructured `rows` from this function's return value keep seeing live rows
+  // after a geometry-driven rebuild.
   const rows: TrackerRow[] = [];
-  for (let i = 0; i < trackerCfg.rowCount; i++) {
-    const worldX = (i - (trackerCfg.rowCount - 1) / 2) * trackerCfg.rowSpacing;
-    const row = createTrackerRow(worldX);
-    scene.add(row.group);
-    rows.push(row);
+
+  function rebuildRows(): void {
+    for (const row of rows) {
+      scene.remove(row.group);
+      row.dispose();
+    }
+    rows.length = 0;
+
+    const geometry = getTrackerGeometry();
+    for (let i = 0; i < trackerCfg.rowCount; i++) {
+      const worldX = (i - (trackerCfg.rowCount - 1) / 2) * geometry.rowSpacingM;
+      const row = createTrackerRow({
+        worldX,
+        hubHeightM: geometry.hubHeightM,
+        moduleLengthM: geometry.moduleLengthM,
+      });
+      scene.add(row.group);
+      rows.push(row);
+    }
   }
+
+  rebuildRows();
+  onGeometryChange(rebuildRows);
 
   const camera = new PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
   camera.position.set(45, 32, 55);
