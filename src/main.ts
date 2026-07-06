@@ -15,12 +15,53 @@ import { createLocationPicker } from "./locationPicker";
 import { createGeometryControl } from "./geometryControl";
 import { createReadingsPanel } from "./readingsPanel";
 import { createSunHoursPanel, HEATMAP_CANVAS_WIDTH_PX, type SunHoursPanel } from "./sunHoursReport";
+import { createTwoDModelView } from "./twoDModel";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const { scene, camera, renderer, controls, sunLightRig, rows } = createAppScene(app);
 
 createGeometryControl(app);
 const readingsPanel = createReadingsPanel(app);
+
+// --- 2D model: a separate schematic elevation view (see twoDModel.ts) that replaces the 3D
+// canvas entirely while keeping the geometry-control, location-picker, and time-control panels in
+// their normal (uncompacted) positions — those describe the same underlying settings regardless
+// of which view is showing. Mutually exclusive with the Cumulative Sun Hours report mode, since
+// both repurpose the main viewing area.
+const twoDModelView = createTwoDModelView();
+app.appendChild(twoDModelView.element);
+
+const twoDModelButton = document.createElement("button");
+twoDModelButton.className = "two-d-model-toggle-button";
+twoDModelButton.textContent = "2D model";
+app.appendChild(twoDModelButton);
+
+let twoDModeActive = false;
+
+function enterTwoDMode(): void {
+  if (reportActive) exitReportMode();
+  twoDModeActive = true;
+  renderer.domElement.style.display = "none";
+  readingsPanel.element.style.display = "none";
+  twoDModelView.setVisible(true);
+  twoDModelButton.textContent = "Back to 3D model";
+}
+
+function exitTwoDMode(): void {
+  twoDModeActive = false;
+  renderer.domElement.style.display = "";
+  readingsPanel.element.style.display = "";
+  twoDModelView.setVisible(false);
+  twoDModelButton.textContent = "2D model";
+}
+
+twoDModelButton.addEventListener("click", () => {
+  if (twoDModeActive) {
+    exitTwoDMode();
+  } else {
+    enterTwoDMode();
+  }
+});
 
 // minutesSinceMidnight is local SOLAR time at the selected site (see sunPosition.ts) —
 // not the browser's system timezone.
@@ -76,6 +117,7 @@ function updateTopDownZoom(): void {
 }
 
 function enterReportMode(): void {
+  if (twoDModeActive) exitTwoDMode();
   reportActive = true;
   timeControl.pause();
   timeControl.setCompact(true);
@@ -192,8 +234,12 @@ function frame() {
   }
   readingsPanel.update(azimuthDeg, altitudeDeg, lastSolarAngleDeg, lastRotationDeg);
 
-  controls.update();
-  renderer.render(scene, camera);
+  if (twoDModeActive) {
+    twoDModelView.update(lastRotationDeg, sunDir.x, sunDir.y);
+  } else {
+    controls.update();
+    renderer.render(scene, camera);
+  }
   requestAnimationFrame(frame);
 }
 
