@@ -16,6 +16,7 @@ import { createGeometryControl } from "./geometryControl";
 import { createReadingsPanel } from "./readingsPanel";
 import { createSunHoursPanel, HEATMAP_CANVAS_WIDTH_PX, type SunHoursPanel } from "./sunHoursReport";
 import { createTwoDModelView } from "./twoDModel";
+import { createIrradianceGraphsPanel, type IrradianceGraphsPanel } from "./irradianceGraphs";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const { scene, camera, renderer, controls, sunLightRig, rows } = createAppScene(app);
@@ -27,9 +28,10 @@ const readingsPanel = createReadingsPanel(app);
 // canvas entirely while keeping the geometry-control, location-picker, and time-control panels in
 // their normal (uncompacted) positions — those describe the same underlying settings regardless
 // of which view is showing. The elevation view itself is shrunk to the upper part of the screen
-// (see style.css) to make room for the same Cumulative Sun Hours matrix+graph panel report mode
-// uses, pushed in underneath it. Mutually exclusive with the Cumulative Sun Hours report mode,
-// since both repurpose the main viewing area.
+// (see style.css) to make room for the irradiance-graphs panel (a day-long time slider plus DNI/
+// GHI/sum graphs, with a cursor line synced to the slider — see irradianceGraphs.ts), pushed in
+// underneath it. Mutually exclusive with the Cumulative Sun Hours report mode, since both
+// repurpose the main viewing area.
 const twoDModelView = createTwoDModelView();
 app.appendChild(twoDModelView.element);
 
@@ -39,10 +41,7 @@ twoDModelButton.textContent = "2D model";
 app.appendChild(twoDModelButton);
 
 let twoDModeActive = false;
-// Reuses the same Cumulative Sun Hours panel component as the "report" mode below — a separate
-// instance (not shared with `sunHoursPanel`) since the two modes are mutually exclusive but each
-// needs its own live DOM element while active.
-let twoDSunHoursPanel: SunHoursPanel | null = null;
+let twoDIrradiancePanel: IrradianceGraphsPanel | null = null;
 
 function enterTwoDMode(): void {
   if (reportActive) exitReportMode();
@@ -51,8 +50,8 @@ function enterTwoDMode(): void {
   readingsPanel.element.style.display = "none";
   twoDModelView.setVisible(true);
   twoDModelButton.textContent = "Back to 3D model";
-  twoDSunHoursPanel = createSunHoursPanel();
-  app.appendChild(twoDSunHoursPanel.element);
+  twoDIrradiancePanel = createIrradianceGraphsPanel();
+  app.appendChild(twoDIrradiancePanel.element);
 }
 
 function exitTwoDMode(): void {
@@ -61,8 +60,8 @@ function exitTwoDMode(): void {
   readingsPanel.element.style.display = "";
   twoDModelView.setVisible(false);
   twoDModelButton.textContent = "2D model";
-  twoDSunHoursPanel?.element.remove();
-  twoDSunHoursPanel = null;
+  twoDIrradiancePanel?.element.remove();
+  twoDIrradiancePanel = null;
 }
 
 twoDModelButton.addEventListener("click", () => {
@@ -169,17 +168,18 @@ sunHoursButton.addEventListener("click", () => {
 // Geometry changes already trigger scene.ts's rebuildRows (so the top-down 3D view updates on
 // its own) — this keeps the heatmap matrix and the top-down camera's zoom (rowSpacingM shifts
 // fieldHalfWidthM, see updateTopDownZoom) in sync while the report panel is open. Location
-// changes matter too (shading depends on lat/lng), so both trigger a heatmap refresh.
+// changes matter too (shading depends on lat/lng), so both trigger a heatmap refresh. The
+// irradiance-graphs panel's DNI/GHI curves depend only on date/location, not geometry, so they
+// only need refreshing on state change.
 onGeometryChange(() => {
   if (reportActive) {
     updateTopDownZoom();
     sunHoursPanel?.refresh();
   }
-  if (twoDModeActive) twoDSunHoursPanel?.refresh();
 });
 onStateChange(() => {
   if (reportActive) sunHoursPanel?.refresh();
-  if (twoDModeActive) twoDSunHoursPanel?.refresh();
+  if (twoDModeActive) twoDIrradiancePanel?.refresh();
 });
 
 let lastFrameTime = performance.now();

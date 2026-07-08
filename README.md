@@ -219,33 +219,43 @@ the file operations npm needs. Work on a real local disk.
   to 50cm depth.
 
   No sun icon — instead, a dense family of parallel yellow rays (spaced every `RAY_SPACING_M`,
-  currently 0.4m) travels top to bottom at the angle implied by the sun direction's X/Y components
+  currently 0.1m — fine enough that a typical field renders several hundred rays, still trivial
+  for SVG) travels top to bottom at the angle implied by the sun direction's X/Y components
   (Z/north-south ignored, the same simplification `computeRowShadowIntervalX` makes). Each ray is
   genuinely raycast (`segmentIntersection`, standard parametric segment-segment test) against all
   4 panel segments: if it hits one, the ray is drawn only up to that point and its ground position
   is shaded dark; if it clears every panel, it's drawn all the way to the grass and that position
   is shaded light — so the grass strip doubles as this view's shadow map, at the same resolution as
-  the ray spacing (`RAY_SPACING_M`, currently 0.2m — dense enough that a typical field renders a
-  couple hundred rays, still trivial for SVG). The whole ray family is anchored on a pivot at
-  (field-center X, hub height) — one ray's *undrawn, unblocked* line always passes exactly through
-  that point — so as the sun angle changes, the family visibly pivots around the tracker axis
-  rather than appearing to drift sideways. Rays are clipped to the sky region via an SVG
-  `<clipPath>` so they never visually spill onto the ground at shallow sun angles.
+  the ray spacing. The whole ray family is anchored on a pivot at (field-center X, hub height) —
+  one ray's *undrawn, unblocked* line always passes exactly through that point — so as the sun
+  angle changes, the family visibly pivots around the tracker axis rather than appearing to drift
+  sideways. Rays are clipped to the sky region via an SVG `<clipPath>` so they never visually spill
+  onto the ground at shallow sun angles.
 
   `main.ts` swaps this in as a full replacement for the 3D canvas (hidden via `display:none`, and
   its render call skipped entirely while 2D mode is active) while leaving the geometry-control,
   location-picker, and time-control panels exactly where they are — those describe the same
   underlying settings regardless of which view is showing. The elevation view's CSS box is shrunk
   to the upper part of the screen (`height: calc(100% - 400px)`, a fixed pixel reservation rather
-  than a percentage, so it reliably fits regardless of window size) so `main.ts`'s
-  `enterTwoDMode` can push a **second, separate instance** of `sunHoursReport.ts`'s
-  `createSunHoursPanel()` in underneath it — the exact same matrix+graph component the Cumulative
-  Sun Hours report uses, refreshed the same way (on `onGeometryChange`/`onStateChange` while 2D
-  mode is active). Mutually exclusive with the Cumulative Sun Hours report mode (entering either
-  one exits the other first), since both repurpose the same main viewing area and would otherwise
-  fight over which `SunHoursPanel` instance is live. Reads the live, rate-limited
-  `lastRotationDeg` (not a separately computed "ideal" angle), so the tracker's angle here always
-  matches what's actually being rendered in the 3D view.
+  than a percentage, so it reliably fits regardless of window size) so `main.ts`'s `enterTwoDMode`
+  can push `irradianceGraphs.ts`'s panel in underneath it. Mutually exclusive with the Cumulative
+  Sun Hours report mode (entering either one exits the other first), since both repurpose the same
+  main viewing area. Reads the live, rate-limited `lastRotationDeg` (not a separately computed
+  "ideal" angle), so the tracker's angle here always matches what's actually being rendered in the
+  3D view.
+- **`src/irradianceGraphs.ts`** — the panel `twoDModel.ts`'s elevation view sits above (in 2D
+  model mode only): a day-long time slider plus three stacked line/area graphs — DNI, GHI, and
+  their literal sum — all sharing one time axis, with a vertical cursor line synced to the slider
+  running through the slider row and all three graphs. Values come from a small, self-contained
+  clear-sky approximation (same Meinel & Meinel 1976 form used elsewhere in this project's
+  history) — there's still no live weather data source in this app, so treat these as illustrative
+  curve shapes, not measured irradiance. The slider, the graph canvases, and the cursor line all
+  need to share one consistent horizontal scale for the "line through the graphs" effect to
+  actually line up: `GRAPH_INDENT_PX` (100px, matching style.css's label-column + y-axis-gutter
+  width) is applied uniformly to all three so the cursor's `left` position (computed in pixels,
+  not a naive 0-100% that would drift out of alignment given the indent) lands in the same place
+  relative to the slider's thumb and each canvas's own time axis — verified directly (dragging the
+  slider to a known value and checking the cursor's screen position against the slider thumb's).
 
 The demo tracker is configured as a **1P** (one module wide per row, portrait orientation)
 layout.

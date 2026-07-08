@@ -294,12 +294,125 @@ canvas {
   left: 0;
   width: 100%;
   /* Shrunk to the upper part of the screen (rather than the full viewport) and pushed to the top,
-     leaving room below for the same Cumulative Sun Hours matrix+graph panel report mode uses —
+     leaving room below for the irradiance-graphs-panel (time slider + DNI/GHI/sum graphs) —
      see main.ts's enterTwoDMode. A fixed pixel reservation rather than a percentage, so the
      panel (roughly constant height regardless of window size) reliably fits underneath. */
   height: calc(100% - 400px);
   /* Matches config.ts's scene.skyColor (0xaee2fb) for visual consistency with the 3D view. */
   background: #aee2fb;
+}
+
+.irradiance-graphs-panel {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  width: 950px;
+  padding: 12px 20px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  box-shadow: var(--panel-shadow);
+  color: var(--text-primary);
+  backdrop-filter: blur(10px);
+}
+
+.irradiance-graphs-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+/* Wraps the slider row + graph rows + x-axis row, all indented by the same 100px (label + y-axis
+   gutter) so the slider's track, the graph canvases, and the vertical cursor line all share one
+   consistent horizontal (time) scale. */
+.irradiance-graphs-stack {
+  position: relative;
+  width: 910px;
+}
+
+.irradiance-time-slider-row {
+  margin-left: 100px;
+  width: 810px;
+  margin-bottom: 4px;
+}
+
+.irradiance-time-slider-row input[type="range"] {
+  width: 100%;
+}
+
+.irradiance-graph-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+
+.irradiance-graph-label {
+  width: 60px;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: right;
+  padding-right: 4px;
+}
+
+.irradiance-graph-canvas-wrap {
+  position: relative;
+  padding-left: 36px;
+}
+
+.irradiance-graph-canvas {
+  display: block;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.irradiance-graph-axis-y {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 32px;
+}
+
+.irradiance-graph-axis-y span {
+  position: absolute;
+  right: 4px;
+  transform: translateY(-50%);
+  font-size: 10px;
+  font-family: var(--mono-font);
+  color: var(--text-muted);
+}
+
+.irradiance-graph-axis-x-row {
+  position: relative;
+  margin-left: 100px;
+  width: 810px;
+  height: 16px;
+}
+
+.irradiance-graph-axis-x-row span {
+  position: absolute;
+  top: 2px;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-family: var(--mono-font);
+  color: var(--text-muted);
+}
+
+.irradiance-time-cursor-line {
+  position: absolute;
+  top: 0;
+  bottom: 16px; /* stop above the x-axis labels rather than crossing through them */
+  width: 1px;
+  background: var(--accent);
+  pointer-events: none;
 }
 
 .sun-hours-panel {
