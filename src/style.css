@@ -336,6 +336,35 @@ canvas {
   width: 910px;
 }
 
+/* Deliberately NOT indented/width-constrained to GRAPH_WIDTH_PX like the slider/graph rows below
+   — this is just a small control row, not part of the shared time-axis alignment. */
+.irradiance-time-header-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.irradiance-time-header-row button {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: #2a3040;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.irradiance-time-header-row button:hover {
+  background: #38405a;
+}
+
+.irradiance-clock-readout {
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+  font-family: var(--mono-font);
+}
+
 .irradiance-time-slider-row {
   margin-left: 100px;
   width: 810px;

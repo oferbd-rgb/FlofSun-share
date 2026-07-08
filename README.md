@@ -244,18 +244,25 @@ the file operations npm needs. Work on a real local disk.
   "ideal" angle), so the tracker's angle here always matches what's actually being rendered in the
   3D view.
 - **`src/irradianceGraphs.ts`** — the panel `twoDModel.ts`'s elevation view sits above (in 2D
-  model mode only): a day-long time slider plus three stacked line/area graphs — DNI, GHI, and
-  their literal sum — all sharing one time axis, with a vertical cursor line synced to the slider
-  running through the slider row and all three graphs. Values come from a small, self-contained
-  clear-sky approximation (same Meinel & Meinel 1976 form used elsewhere in this project's
-  history) — there's still no live weather data source in this app, so treat these as illustrative
-  curve shapes, not measured irradiance. The slider, the graph canvases, and the cursor line all
-  need to share one consistent horizontal scale for the "line through the graphs" effect to
-  actually line up: `GRAPH_INDENT_PX` (100px, matching style.css's label-column + y-axis-gutter
-  width) is applied uniformly to all three so the cursor's `left` position (computed in pixels,
-  not a naive 0-100% that would drift out of alignment given the indent) lands in the same place
-  relative to the slider's thumb and each canvas's own time axis — verified directly (dragging the
-  slider to a known value and checking the cursor's screen position against the slider thumb's).
+  model mode only): its own self-contained time control (Play button + clock, mirroring
+  `timeControl.ts`'s feature set but entirely independent — it drives only this panel, not the
+  main app clock or the 2D elevation view's tracker rotation) plus three stacked line/area graphs
+  decomposing horizontal irradiance, all sharing one time axis, with a vertical cursor line synced
+  to the slider running through the slider row and all three graphs. The three graphs are
+  deliberately additive: `DNI·sin(SE)` (the direct beam's own contribution to a horizontal
+  surface), the fully-shaded/sky-only diffuse contribution (`DHI` alone — what the surface would
+  receive if the beam were completely blocked), and their sum, which is exactly the real unshaded
+  GHI. Values come from a small, self-contained clear-sky approximation (same Meinel & Meinel 1976
+  form used elsewhere in this project's history) — there's still no live weather data source in
+  this app, so treat these as illustrative curve shapes, not measured irradiance. The slider, the
+  graph canvases, and the cursor line all need to share one consistent horizontal scale for the
+  "line through the graphs" effect to actually line up: `GRAPH_INDENT_PX` (100px, matching
+  style.css's label-column + y-axis-gutter width) is applied uniformly to all three so the
+  cursor's `left` position (computed in pixels, not a naive 0-100% that would drift out of
+  alignment given the indent) lands in the same place relative to the slider's thumb and each
+  canvas's own time axis — verified directly (dragging the slider to a known value and checking
+  the cursor's screen position against the slider thumb's). The header row (Play button + clock)
+  is deliberately outside that aligned zone, so it doesn't eat into the fixed-width slider track.
 
 The demo tracker is configured as a **1P** (one module wide per row, portrait orientation)
 layout.

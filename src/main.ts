@@ -248,6 +248,7 @@ function frame() {
 
   if (twoDModeActive) {
     twoDModelView.update(lastRotationDeg, sunDir.x, sunDir.y);
+    twoDIrradiancePanel?.advance(realDeltaSeconds);
   } else {
     controls.update();
     renderer.render(scene, camera);

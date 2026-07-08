@@ -1,11 +1,14 @@
-// A time slider plus three stacked graphs (DNI, GHI, and their sum) for the currently selected
-// day, with a vertical cursor line synced from the slider through all three — a lighter-weight
-// companion to the (now removed) ground-shading matrix, focused purely on irradiance over time
-// rather than ground position. No live weather data source exists in this app — DNI/DHI come from
-// a simple, self-contained clear-sky approximation (Meinel & Meinel 1976 form), clearly a
-// stand-in rather than measured data.
+// A time slider (with its own clock + play button, mirroring timeControl.ts's feature set but
+// entirely self-contained — dragging/playing it does not affect the main app clock or the 2D
+// elevation view's tracker rotation) plus three stacked graphs decomposing horizontal irradiance
+// for the currently selected day, with a vertical cursor line synced from the slider through all
+// three. A lighter-weight companion to the (now removed) ground-shading matrix, focused purely on
+// irradiance over time rather than ground position. No live weather data source exists in this
+// app — DNI/DHI come from a simple, self-contained clear-sky approximation (Meinel & Meinel 1976
+// form), clearly a stand-in rather than measured data.
 import { getDate, getLocation } from "./appState";
 import { getSunAngles, localSolarTimeToDate } from "./sunPosition";
+import { animation as animationCfg } from "./config";
 
 const GRAPH_WIDTH_PX = 810; // matches sunHoursReport.ts's HEATMAP_CANVAS_WIDTH_PX for visual consistency
 const GRAPH_HEIGHT_PX = 80;
@@ -32,10 +35,15 @@ function clearSkyIrradiance(altitudeDeg: number): { dni: number; dhi: number } {
   return { dni, dhi };
 }
 
+// Three views of horizontal irradiance, decomposed so the third is literally the sum of the
+// first two: beamHorizontal (DNI*sin(solar elevation) — the direct beam's own contribution once
+// projected onto a horizontal surface), diffuseShaded (DHI alone — what a horizontal surface
+// would receive if the beam were fully blocked and only the sky's diffuse light reached it), and
+// their sum (which is exactly the real, fully unshaded GHI).
 interface DaySeries {
   timeMinutes: number[];
-  dni: number[];
-  ghi: number[];
+  beamHorizontal: number[];
+  diffuseShaded: number[];
   sum: number[];
 }
 
@@ -43,23 +51,23 @@ function computeDaySeries(): DaySeries {
   const dateState = getDate();
   const location = getLocation();
   const timeMinutes: number[] = [];
-  const dni: number[] = [];
-  const ghi: number[] = [];
+  const beamHorizontal: number[] = [];
+  const diffuseShaded: number[] = [];
   const sum: number[] = [];
 
   for (let minutes = 0; minutes < MINUTES_PER_DAY; minutes += TIME_STEP_MINUTES) {
     const date = localSolarTimeToDate(dateState, minutes, location.longitude);
     const { altitudeDeg } = getSunAngles(date, location.latitude, location.longitude);
-    const { dni: dniVal, dhi } = clearSkyIrradiance(altitudeDeg);
+    const { dni, dhi } = clearSkyIrradiance(altitudeDeg);
     const sinAltitude = Math.max(0, Math.sin((altitudeDeg * Math.PI) / 180));
-    const ghiVal = dniVal * sinAltitude + dhi;
+    const beamVal = dni * sinAltitude;
     timeMinutes.push(minutes);
-    dni.push(dniVal);
-    ghi.push(ghiVal);
-    sum.push(dniVal + ghiVal);
+    beamHorizontal.push(beamVal);
+    diffuseShaded.push(dhi);
+    sum.push(beamVal + dhi);
   }
 
-  return { timeMinutes, dni, ghi, sum };
+  return { timeMinutes, beamHorizontal, diffuseShaded, sum };
 }
 
 function formatClock(minutes: number): string {
@@ -123,24 +131,57 @@ function createValueYAxis(maxVal: number, unit: string): HTMLElement {
   return axis;
 }
 
+function createGraphRow(labelText: string, titleText: string): { row: HTMLElement; canvasWrap: HTMLElement } {
+  const row = document.createElement("div");
+  row.className = "irradiance-graph-row";
+  const label = document.createElement("div");
+  label.className = "irradiance-graph-label";
+  label.textContent = labelText;
+  label.title = titleText;
+  const canvasWrap = document.createElement("div");
+  canvasWrap.className = "irradiance-graph-canvas-wrap";
+  row.appendChild(label);
+  row.appendChild(canvasWrap);
+  return { row, canvasWrap };
+}
+
 export interface IrradianceGraphsPanel {
   element: HTMLElement;
   refresh(): void;
+  // Advances the panel's own clock (only while its Play button is toggled on) — mirrors
+  // timeControl.ts's advance(), called from main.ts's frame loop the same way, but drives only
+  // this panel's slider/cursor, not the main app clock or the 2D elevation view.
+  advance(realDeltaSeconds: number): void;
 }
 
 export function createIrradianceGraphsPanel(): IrradianceGraphsPanel {
+  let minutesSinceMidnight = 720; // solar noon-ish default
+  let playing = false;
+
   const panel = document.createElement("div");
   panel.className = "irradiance-graphs-panel";
 
   const title = document.createElement("div");
   title.className = "irradiance-graphs-title";
-  title.textContent = "DNI / GHI throughout the day (clear-sky approximation)";
+  title.textContent = "Horizontal irradiance components throughout the day (clear-sky approximation)";
   panel.appendChild(title);
 
   // Wraps the slider row and the graph rows together so the cursor line's height can span both.
   const stack = document.createElement("div");
   stack.className = "irradiance-graphs-stack";
   panel.appendChild(stack);
+
+  // Header row (play button + clock) — deliberately NOT part of the indented/aligned zone the
+  // slider/graphs/cursor share, so it doesn't eat into that fixed GRAPH_WIDTH_PX alignment.
+  const headerRow = document.createElement("div");
+  headerRow.className = "irradiance-time-header-row";
+  const playButton = document.createElement("button");
+  playButton.textContent = "Play";
+  const clockReadout = document.createElement("span");
+  clockReadout.className = "irradiance-clock-readout";
+  headerRow.appendChild(playButton);
+  headerRow.appendChild(clockReadout);
+  stack.appendChild(headerRow);
 
   const sliderRow = document.createElement("div");
   sliderRow.className = "irradiance-time-slider-row";
@@ -149,41 +190,17 @@ export function createIrradianceGraphsPanel(): IrradianceGraphsPanel {
   slider.min = "0";
   slider.max = String(MINUTES_PER_DAY - 1);
   slider.step = String(TIME_STEP_MINUTES);
-  slider.value = "720"; // solar noon-ish default
+  slider.value = String(minutesSinceMidnight);
   sliderRow.appendChild(slider);
   stack.appendChild(sliderRow);
 
-  const dniRow = document.createElement("div");
-  dniRow.className = "irradiance-graph-row";
-  const dniLabel = document.createElement("div");
-  dniLabel.className = "irradiance-graph-label";
-  dniLabel.textContent = "DNI";
-  const dniCanvasWrap = document.createElement("div");
-  dniCanvasWrap.className = "irradiance-graph-canvas-wrap";
-  dniRow.appendChild(dniLabel);
-  dniRow.appendChild(dniCanvasWrap);
-  stack.appendChild(dniRow);
+  const { row: beamRow, canvasWrap: beamCanvasWrap } = createGraphRow("DNI·sinSE", "DNI·sin(SE) — the beam's contribution to the horizontal");
+  stack.appendChild(beamRow);
 
-  const ghiRow = document.createElement("div");
-  ghiRow.className = "irradiance-graph-row";
-  const ghiLabel = document.createElement("div");
-  ghiLabel.className = "irradiance-graph-label";
-  ghiLabel.textContent = "GHI";
-  const ghiCanvasWrap = document.createElement("div");
-  ghiCanvasWrap.className = "irradiance-graph-canvas-wrap";
-  ghiRow.appendChild(ghiLabel);
-  ghiRow.appendChild(ghiCanvasWrap);
-  stack.appendChild(ghiRow);
+  const { row: diffuseRow, canvasWrap: diffuseCanvasWrap } = createGraphRow("Shaded", "Horizontal surface, fully shaded (sky only)");
+  stack.appendChild(diffuseRow);
 
-  const sumRow = document.createElement("div");
-  sumRow.className = "irradiance-graph-row";
-  const sumLabel = document.createElement("div");
-  sumLabel.className = "irradiance-graph-label";
-  sumLabel.textContent = "DNI+GHI";
-  const sumCanvasWrap = document.createElement("div");
-  sumCanvasWrap.className = "irradiance-graph-canvas-wrap";
-  sumRow.appendChild(sumLabel);
-  sumRow.appendChild(sumCanvasWrap);
+  const { row: sumRow, canvasWrap: sumCanvasWrap } = createGraphRow("Sum (GHI)", "Sum of the beam and shaded-sky contributions — the full unshaded GHI");
   stack.appendChild(sumRow);
 
   const axisXRow = document.createElement("div");
@@ -194,17 +211,34 @@ export function createIrradianceGraphsPanel(): IrradianceGraphsPanel {
   cursorLine.className = "irradiance-time-cursor-line";
   stack.appendChild(cursorLine);
 
-  function repositionCursor(): void {
-    const frac = Number(slider.value) / MINUTES_PER_DAY;
+  function refreshDisplay(): void {
+    slider.value = String(minutesSinceMidnight);
+    clockReadout.textContent = formatClock(minutesSinceMidnight);
+    const frac = minutesSinceMidnight / MINUTES_PER_DAY;
     cursorLine.style.left = `${GRAPH_INDENT_PX + frac * GRAPH_WIDTH_PX}px`;
   }
-  slider.addEventListener("input", repositionCursor);
+
+  playButton.addEventListener("click", () => {
+    playing = !playing;
+    playButton.textContent = playing ? "Pause" : "Play";
+  });
+
+  slider.addEventListener("input", () => {
+    minutesSinceMidnight = Number(slider.value);
+    refreshDisplay();
+  });
 
   function refresh(): void {
     const series = computeDaySeries();
 
-    dniCanvasWrap.replaceChildren(createValueYAxis(Math.max(1e-6, ...series.dni), ""), drawSeriesCanvas(series.dni, "#ffb84d"));
-    ghiCanvasWrap.replaceChildren(createValueYAxis(Math.max(1e-6, ...series.ghi), ""), drawSeriesCanvas(series.ghi, "#4fd1c5"));
+    beamCanvasWrap.replaceChildren(
+      createValueYAxis(Math.max(1e-6, ...series.beamHorizontal), ""),
+      drawSeriesCanvas(series.beamHorizontal, "#ffb84d"),
+    );
+    diffuseCanvasWrap.replaceChildren(
+      createValueYAxis(Math.max(1e-6, ...series.diffuseShaded), ""),
+      drawSeriesCanvas(series.diffuseShaded, "#4fd1c5"),
+    );
     sumCanvasWrap.replaceChildren(createValueYAxis(Math.max(1e-6, ...series.sum), ""), drawSeriesCanvas(series.sum, "#c98bf0"));
 
     axisXRow.replaceChildren();
@@ -216,10 +250,17 @@ export function createIrradianceGraphsPanel(): IrradianceGraphsPanel {
       axisXRow.appendChild(label);
     }
 
-    repositionCursor();
+    refreshDisplay();
+  }
+
+  function advance(realDeltaSeconds: number): void {
+    if (!playing) return;
+    minutesSinceMidnight += realDeltaSeconds * animationCfg.simMinutesPerRealSecond;
+    if (minutesSinceMidnight >= MINUTES_PER_DAY) minutesSinceMidnight -= MINUTES_PER_DAY;
+    refreshDisplay();
   }
 
   refresh();
 
-  return { element: panel, refresh };
+  return { element: panel, refresh, advance };
 }
