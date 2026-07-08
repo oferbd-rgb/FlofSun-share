@@ -41,8 +41,8 @@ export interface TwoDModelView {
 const SVG_NS = "http://www.w3.org/2000/svg";
 const SOIL_DEPTH_M = 0.5;
 const GRASS_THICKNESS_M = 0.35;
-const SKY_MARGIN_M = 4;
-const FIELD_MARGIN_M = 3;
+const SKY_MARGIN_M = 9; // zoomed out further per feedback (was 4)
+const FIELD_MARGIN_M = 9; // zoomed out further per feedback (was 3)
 const RAY_SPACING_M = 0.1; // dense — this is also the grass-shading segment width
 const MAX_RAY_COUNT = 1600; // safety cap for extreme geometry (very wide fields)
 const RAY_COLOR = "#ffdd33";

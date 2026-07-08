@@ -24,7 +24,11 @@ function fallbackLabel(lat: number, lng: number): string {
   return `Lat ${lat.toFixed(2)}, Lon ${lng.toFixed(2)}`;
 }
 
-export function createLocationPicker(container: HTMLElement): void {
+export interface LocationPicker {
+  element: HTMLElement;
+}
+
+export function createLocationPicker(container: HTMLElement): LocationPicker {
   const panel = document.createElement("div");
   panel.className = "location-picker";
 
@@ -80,4 +84,6 @@ export function createLocationPicker(container: HTMLElement): void {
     setLocation(updated);
     refreshInfo(updated);
   });
+
+  return { element: panel };
 }

@@ -25,13 +25,13 @@ createGeometryControl(app);
 const readingsPanel = createReadingsPanel(app);
 
 // --- 2D model: a separate schematic elevation view (see twoDModel.ts) that replaces the 3D
-// canvas entirely while keeping the geometry-control, location-picker, and time-control panels in
-// their normal (uncompacted) positions — those describe the same underlying settings regardless
-// of which view is showing. The elevation view itself is shrunk to the upper part of the screen
-// (see style.css) to make room for the irradiance-graphs panel (a day-long time slider plus DNI/
-// GHI/sum graphs, with a cursor line synced to the slider — see irradianceGraphs.ts), pushed in
-// underneath it. Mutually exclusive with the Cumulative Sun Hours report mode, since both
-// repurpose the main viewing area.
+// canvas entirely while keeping the geometry-control and time-control panels live (those describe
+// the same underlying settings regardless of which view is showing) — but hides the map (there's
+// no 3D scene to relocate on here) and relocates just the date input to where the map used to be,
+// since the rest of the time control is re-parented into the irradiance-graphs panel below the
+// elevation view (see createIrradianceGraphsPanel). The elevation view itself is shrunk to the
+// upper part of the screen (see style.css) to make room for that panel underneath it. Mutually
+// exclusive with the Cumulative Sun Hours report mode, since both repurpose the main viewing area.
 const twoDModelView = createTwoDModelView();
 app.appendChild(twoDModelView.element);
 
@@ -48,8 +48,16 @@ function enterTwoDMode(): void {
   twoDModeActive = true;
   renderer.domElement.style.display = "none";
   readingsPanel.element.style.display = "none";
+  locationPicker.element.style.display = "none";
   twoDModelView.setVisible(true);
   twoDModelButton.textContent = "Back to 3D model";
+
+  const dateInput = timeControl.element.querySelector<HTMLElement>(".date-input");
+  if (dateInput) {
+    twoDDateCorner.appendChild(dateInput);
+    app.appendChild(twoDDateCorner);
+  }
+
   // Re-parents the actual timeControl (see createIrradianceGraphsPanel) — appending the panel
   // first, then refreshing, since its internal alignment measurements need real layout.
   twoDIrradiancePanel = createIrradianceGraphsPanel(timeControl);
@@ -61,10 +69,18 @@ function exitTwoDMode(): void {
   twoDModeActive = false;
   renderer.domElement.style.display = "";
   readingsPanel.element.style.display = "";
+  locationPicker.element.style.display = "";
   twoDModelView.setVisible(false);
   twoDModelButton.textContent = "2D model";
+
   // Move the real timeControl back to its normal spot before removing the panel it's currently
-  // nested in, so it isn't torn out along with it.
+  // nested in, so it isn't torn out along with it — and restore the date input as its first child
+  // before that, matching its original position (timeControl.ts appends it first).
+  const dateInput = twoDDateCorner.querySelector<HTMLElement>(".date-input");
+  if (dateInput) {
+    timeControl.element.insertBefore(dateInput, timeControl.element.firstChild);
+  }
+  twoDDateCorner.remove();
   app.appendChild(timeControl.element);
   twoDIrradiancePanel?.element.remove();
   twoDIrradiancePanel = null;
@@ -87,7 +103,13 @@ function dateAt(minutesSinceMidnight: number): Date {
 const initialLocation = getLocation();
 const bounds = getDaylightBounds(getDate(), initialLocation.latitude, initialLocation.longitude);
 const timeControl = createTimeControl(app, bounds);
-createLocationPicker(app);
+const locationPicker = createLocationPicker(app);
+
+// A small top-left panel that the date input (normally part of timeControl.element) moves into
+// while 2D mode is active — replacing the map there, which 2D mode hides instead (see
+// enterTwoDMode/exitTwoDMode).
+const twoDDateCorner = document.createElement("div");
+twoDDateCorner.className = "two-d-date-corner";
 
 onStateChange(() => {
   const loc = getLocation();
@@ -175,13 +197,14 @@ sunHoursButton.addEventListener("click", () => {
 // its own) — this keeps the heatmap matrix and the top-down camera's zoom (rowSpacingM shifts
 // fieldHalfWidthM, see updateTopDownZoom) in sync while the report panel is open. Location
 // changes matter too (shading depends on lat/lng), so both trigger a heatmap refresh. The
-// irradiance-graphs panel's DNI/GHI curves depend only on date/location, not geometry, so they
-// only need refreshing on state change.
+// irradiance-graphs panel's DNI·sinSE row now also depends on geometry (row spacing/hub height/
+// module length feed its inter-row self-shading check), so it needs refreshing on both.
 onGeometryChange(() => {
   if (reportActive) {
     updateTopDownZoom();
     sunHoursPanel?.refresh();
   }
+  if (twoDModeActive) twoDIrradiancePanel?.refresh();
 });
 onStateChange(() => {
   if (reportActive) sunHoursPanel?.refresh();

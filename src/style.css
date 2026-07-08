@@ -122,6 +122,19 @@ canvas {
   cursor: pointer;
 }
 
+/* Where the date input (normally the first child of .time-control) moves to while 2D model mode
+   is active — same corner the map (.location-picker, hidden in that mode) normally occupies. */
+.two-d-date-corner {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  padding: 10px;
+  background: rgba(20, 24, 32, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  backdrop-filter: blur(6px);
+}
+
 .location-picker-info {
   margin-top: 8px;
   font-size: 13px;
@@ -307,7 +320,13 @@ canvas {
   left: 50%;
   bottom: 24px;
   transform: translateX(-50%);
-  width: 950px;
+  /* fit-content (not a fixed width) so the panel always grows to actually contain its rows —
+     a fixed width here previously left graph rows (whose left margin is set dynamically in JS
+     to match the real slider's position, see irradianceGraphs.ts) with less remaining space than
+     their content needed, silently overflowing the panel's own box, unclipped, off the right
+     edge of the screen. */
+  width: fit-content;
+  max-width: 96vw;
   padding: 12px 20px;
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
@@ -330,11 +349,11 @@ canvas {
 
 /* Wraps the (real, re-parented) time control and the graph rows together so the cursor line's
    height can span both, and so alignment measurements (main.ts/irradianceGraphs.ts) are relative
-   to one common ancestor. Row-level left margins are set dynamically in JS to match wherever the
-   real slider actually renders, not a fixed value — see measureAndAlign() in irradianceGraphs.ts. */
+   to one common ancestor. fit-content for the same reason as .irradiance-graphs-panel above —
+   sized to whichever row actually needs the most space, not a guessed fixed value. */
 .irradiance-graphs-stack {
   position: relative;
-  width: 910px;
+  width: fit-content;
 }
 
 /* Overrides .time-control's normal `position: fixed` bottom-center placement while it's
@@ -350,10 +369,12 @@ canvas {
   width: fit-content;
 }
 
-/* Forces the embedded slider to the same width as the graph canvases below, so both share one
-   horizontal (time) scale — normally 320px (style.css's .time-control rule), sized for the
+/* Forces the embedded slider (and the tracking/anti-tracking schedule bar directly below it) to
+   the same width as the graph canvases below, so both share one horizontal (time) scale —
+   normally 320px (style.css's .time-control/.tracking-schedule-bar rules), sized for the
    bottom-center 3D view instead. */
-.irradiance-graphs-panel .time-control input[type="range"] {
+.irradiance-graphs-panel .time-control input[type="range"],
+.irradiance-graphs-panel .tracking-schedule-bar {
   width: 810px;
 }
 
@@ -363,6 +384,11 @@ canvas {
   align-items: center;
   gap: 10px;
   margin-bottom: 2px;
+  /* Sized to its actual content (canvas + gap + total label) regardless of how much space its
+     parent happens to have left after the row's own dynamically-set left margin — a block-level
+     flex row left to auto-size within its remaining parent width would otherwise get squeezed
+     narrower than its content needs, silently overflowing that narrower box unclipped. */
+  width: fit-content;
 }
 
 /* Positioned absolutely (out of flow) so the row's own box starts at its canvas-wrap, not here —

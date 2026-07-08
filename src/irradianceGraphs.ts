@@ -13,8 +13,10 @@
 // bounds the other two. No live weather data source exists in this app — DNI/DHI come from a
 // simple, self-contained clear-sky approximation (Meinel & Meinel 1976 form), clearly a stand-in
 // rather than measured data.
-import { getDate, getLocation } from "./appState";
+import { tracker as trackerCfg } from "./config";
+import { getDate, getLocation, getTrackerGeometry, getTrackingModeAt } from "./appState";
 import { getDaylightBounds, getSunAngles, localSolarTimeToDate, type DaylightBounds } from "./sunPosition";
+import { computeAntiTrackingRotationDeg, computeTrackerRotationDeg } from "./trackerMath";
 import type { TimeControl } from "./timeControl";
 
 const GRAPH_WIDTH_PX = 810; // matches sunHoursReport.ts's HEATMAP_CANVAS_WIDTH_PX, and forced onto
@@ -42,9 +44,76 @@ function clearSkyIrradiance(altitudeDeg: number): { dni: number; dhi: number } {
   return { dni, dhi };
 }
 
+interface Point {
+  x: number;
+  y: number;
+}
+
+// Standard segment-segment intersection test (same approach as twoDModel.ts's ray-vs-panel
+// raycasting) — used below to check whether a row's own panel blocks direct sun from reaching a
+// neighboring row's panel.
+function segmentsIntersect(a1: Point, a2: Point, b1: Point, b2: Point): boolean {
+  const d1x = a2.x - a1.x;
+  const d1y = a2.y - a1.y;
+  const d2x = b2.x - b1.x;
+  const d2y = b2.y - b1.y;
+  const denom = d1x * d2y - d1y * d2x;
+  if (Math.abs(denom) < 1e-9) return false;
+  const t = ((b1.x - a1.x) * d2y - (b1.y - a1.y) * d2x) / denom;
+  const s = ((b1.x - a1.x) * d1y - (b1.y - a1.y) * d1x) / denom;
+  return t >= 0 && t <= 1 && s >= 0 && s <= 1;
+}
+
+// World X position of each row's torque-tube center, evenly spaced and centered on X=0 — same
+// formula scene.ts's rebuildRows uses to place each TrackerRow.
+function rowWorldXPositions(rowCount: number, rowSpacingM: number): number[] {
+  const positions: number[] = [];
+  for (let i = 0; i < rowCount; i++) {
+    positions.push((i - (rowCount - 1) / 2) * rowSpacingM);
+  }
+  return positions;
+}
+
+// Whether a representative interior row (one with a neighbor on each side, where possible) is
+// itself shaded by an adjacent row's panel at this moment — inter-row self-shading, distinct from
+// the ground-shading this app used to compute (removed). Raycasts from that row's own hub, toward
+// the sun, and checks for an intersection with any *other* row's panel segment before reaching
+// open sky; if the ray is blocked, no direct beam reaches this row's panel at all.
+function isRepresentativeRowShaded(rotationDeg: number, sunDirX: number, sunDirY: number): boolean {
+  const geometry = getTrackerGeometry();
+  const rowXs = rowWorldXPositions(trackerCfg.rowCount, geometry.rowSpacingM);
+  if (rowXs.length < 2) return false;
+  const representativeIndex = Math.floor(rowXs.length / 2);
+  const rowX = rowXs[representativeIndex];
+
+  const dirLen = Math.hypot(sunDirX, sunDirY);
+  if (dirLen === 0) return false;
+  const towardSunX = sunDirX / dirLen;
+  const towardSunY = sunDirY / dirLen;
+  const rayLength = 1000; // far enough to clear the whole field regardless of geometry
+  const start: Point = { x: rowX, y: geometry.hubHeightM };
+  const end: Point = { x: rowX + towardSunX * rayLength, y: geometry.hubHeightM + towardSunY * rayLength };
+
+  const rotationRad = (rotationDeg * Math.PI) / 180;
+  const halfLength = geometry.moduleLengthM / 2;
+  const edgeX = halfLength * Math.cos(rotationRad);
+  const edgeY = halfLength * Math.sin(rotationRad);
+
+  return rowXs.some((otherRowX, i) => {
+    if (i === representativeIndex) return false;
+    const p1: Point = { x: otherRowX - edgeX, y: geometry.hubHeightM - edgeY };
+    const p2: Point = { x: otherRowX + edgeX, y: geometry.hubHeightM + edgeY };
+    return segmentsIntersect(start, end, p1, p2);
+  });
+}
+
 interface DaySeries {
   timeMinutes: number[];
+  // The direct beam's theoretical, always-unshaded contribution to a horizontal surface.
   beamHorizontal: number[];
+  // The same, but zeroed at moments when a representative row is shaded by a neighbor —
+  // beamHorizontal is always >= beamHorizontalActual.
+  beamHorizontalActual: number[];
   diffuseShaded: number[];
   sum: number[];
 }
@@ -52,25 +121,45 @@ interface DaySeries {
 function computeDaySeries(bounds: DaylightBounds): DaySeries {
   const dateState = getDate();
   const location = getLocation();
+  const geometry = getTrackerGeometry();
   const timeMinutes: number[] = [];
   const beamHorizontal: number[] = [];
+  const beamHorizontalActual: number[] = [];
   const diffuseShaded: number[] = [];
   const sum: number[] = [];
 
   const start = Math.floor(bounds.sunriseMinutes / TIME_STEP_MINUTES) * TIME_STEP_MINUTES;
   for (let minutes = start; minutes <= bounds.sunsetMinutes; minutes += TIME_STEP_MINUTES) {
     const date = localSolarTimeToDate(dateState, minutes, location.longitude);
-    const { altitudeDeg } = getSunAngles(date, location.latitude, location.longitude);
+    const { azimuthDeg, altitudeDeg } = getSunAngles(date, location.latitude, location.longitude);
     const { dni, dhi } = clearSkyIrradiance(altitudeDeg);
-    const sinAltitude = Math.max(0, Math.sin((altitudeDeg * Math.PI) / 180));
-    const beamVal = dni * sinAltitude;
+    const azRad = (azimuthDeg * Math.PI) / 180;
+    const elRad = (altitudeDeg * Math.PI) / 180;
+    const sunDirX = Math.sin(azRad) * Math.cos(elRad);
+    const sunDirY = Math.max(0, Math.sin(elRad));
+    const beamVal = dni * sunDirY;
+
+    // Uses the deterministic tracking/anti-tracking angle (same formulas as main.ts's render
+    // loop, but not the live rate-limited rotation) — this describes a fixed, reproducible
+    // outcome for the current settings, same reasoning shadeAnalysis.ts used.
+    let shaded = false;
+    if (sunDirY > 0) {
+      const trackingAngleDeg = computeTrackerRotationDeg(azimuthDeg, altitudeDeg, geometry.axisAzimuthDeg, trackerCfg.maxRotationDeg);
+      const rotationDeg =
+        getTrackingModeAt(minutes) === "track"
+          ? trackingAngleDeg
+          : computeAntiTrackingRotationDeg(trackingAngleDeg, trackerCfg.maxRotationDeg, geometry.moduleLengthM, sunDirX, sunDirY);
+      shaded = isRepresentativeRowShaded(rotationDeg, sunDirX, sunDirY);
+    }
+
     timeMinutes.push(minutes);
     beamHorizontal.push(beamVal);
+    beamHorizontalActual.push(shaded ? 0 : beamVal);
     diffuseShaded.push(dhi);
     sum.push(beamVal + dhi);
   }
 
-  return { timeMinutes, beamHorizontal, diffuseShaded, sum };
+  return { timeMinutes, beamHorizontal, beamHorizontalActual, diffuseShaded, sum };
 }
 
 // Wh/m^2 — integrates a W/m^2 series over TIME_STEP_MINUTES-wide steps (trapezoid-free, simple
@@ -85,6 +174,59 @@ function formatClock(minutes: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
+function xAtFor(count: number): (i: number) => number {
+  return (i: number) => (i / Math.max(1, count - 1)) * GRAPH_WIDTH_PX;
+}
+
+function yAtFor(sharedMaxVal: number): (v: number) => number {
+  const padTop = 4;
+  const padBottom = 2;
+  const plotHeight = GRAPH_HEIGHT_PX - padTop - padBottom;
+  return (v: number) => GRAPH_HEIGHT_PX - padBottom - (v / sharedMaxVal) * plotHeight;
+}
+
+function tracePath(ctx: CanvasRenderingContext2D, values: number[], xAt: (i: number) => number, yAt: (v: number) => number): void {
+  ctx.beginPath();
+  values.forEach((v, i) => {
+    const x = xAt(i);
+    const y = yAt(v);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+}
+
+function fillAreaUnder(
+  ctx: CanvasRenderingContext2D,
+  values: number[],
+  xAt: (i: number) => number,
+  yAt: (v: number) => number,
+  fillStyle: string,
+): void {
+  tracePath(ctx, values, xAt, yAt);
+  ctx.lineTo(xAt(values.length - 1), GRAPH_HEIGHT_PX);
+  ctx.lineTo(xAt(0), GRAPH_HEIGHT_PX);
+  ctx.closePath();
+  ctx.fillStyle = fillStyle;
+  ctx.fill();
+}
+
+function strokeLine(
+  ctx: CanvasRenderingContext2D,
+  values: number[],
+  xAt: (i: number) => number,
+  yAt: (v: number) => number,
+  strokeStyle: string,
+  lineWidth: number,
+  dashed: boolean,
+): void {
+  tracePath(ctx, values, xAt, yAt);
+  ctx.setLineDash(dashed ? [4, 3] : []);
+  ctx.strokeStyle = strokeStyle;
+  ctx.lineWidth = lineWidth;
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
 function drawSeriesCanvas(values: number[], sharedMaxVal: number, color: string): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = GRAPH_WIDTH_PX;
@@ -92,35 +234,30 @@ function drawSeriesCanvas(values: number[], sharedMaxVal: number, color: string)
   canvas.className = "irradiance-graph-canvas";
 
   const ctx = canvas.getContext("2d")!;
-  const padTop = 4;
-  const padBottom = 2;
-  const plotHeight = GRAPH_HEIGHT_PX - padTop - padBottom;
-  const xAt = (i: number) => (i / Math.max(1, values.length - 1)) * GRAPH_WIDTH_PX;
-  const yAt = (v: number) => GRAPH_HEIGHT_PX - padBottom - (v / sharedMaxVal) * plotHeight;
+  const xAt = xAtFor(values.length);
+  const yAt = yAtFor(sharedMaxVal);
+  fillAreaUnder(ctx, values, xAt, yAt, color + "33"); // ~20% alpha
+  strokeLine(ctx, values, xAt, yAt, color, 1.5, false);
 
-  ctx.beginPath();
-  values.forEach((v, i) => {
-    const x = xAt(i);
-    const y = yAt(v);
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
-  ctx.lineTo(xAt(values.length - 1), GRAPH_HEIGHT_PX);
-  ctx.lineTo(xAt(0), GRAPH_HEIGHT_PX);
-  ctx.closePath();
-  ctx.fillStyle = color + "33"; // ~20% alpha
-  ctx.fill();
+  return canvas;
+}
 
-  ctx.beginPath();
-  values.forEach((v, i) => {
-    const x = xAt(i);
-    const y = yAt(v);
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
+// Two overlaid renderings of the same underlying quantity: a dashed, unfilled outline for the
+// theoretical (always-unshaded) upper limit, drawn first (so it sits behind), and a filled area
+// for the actual, self-shading-aware series drawn on top of it.
+function drawBeamCanvas(theoreticalValues: number[], actualValues: number[], sharedMaxVal: number, color: string): HTMLCanvasElement {
+  const canvas = document.createElement("canvas");
+  canvas.width = GRAPH_WIDTH_PX;
+  canvas.height = GRAPH_HEIGHT_PX;
+  canvas.className = "irradiance-graph-canvas";
+
+  const ctx = canvas.getContext("2d")!;
+  const xAt = xAtFor(theoreticalValues.length);
+  const yAt = yAtFor(sharedMaxVal);
+
+  strokeLine(ctx, theoreticalValues, xAt, yAt, color, 1, true);
+  fillAreaUnder(ctx, actualValues, xAt, yAt, color + "55"); // ~33% alpha — a bit stronger than drawSeriesCanvas's, so the filled (real) layer reads clearly in front of the dashed outline
+  strokeLine(ctx, actualValues, xAt, yAt, color, 1.5, false);
 
   return canvas;
 }
@@ -190,7 +327,9 @@ export function createIrradianceGraphsPanel(timeControl: TimeControl): Irradianc
 
   const { row: beamRow, canvasWrap: beamCanvasWrap, totalLabel: beamTotalLabel } = createGraphRow(
     "DNI·sinSE",
-    "DNI·sin(SE) — the beam's contribution to the horizontal",
+    "DNI·sin(SE) — the beam's contribution to the horizontal. Dashed outline: theoretical " +
+      "unshaded upper limit. Filled: actual, zeroed whenever a representative row is shaded by " +
+      "a neighboring row.",
   );
   stack.appendChild(beamRow);
 
@@ -252,10 +391,17 @@ export function createIrradianceGraphsPanel(timeControl: TimeControl): Irradianc
     // component, so its own max naturally bounds the other two too.
     const sharedMaxVal = Math.max(1e-6, ...series.sum);
 
-    beamCanvasWrap.replaceChildren(createValueYAxis(sharedMaxVal), drawSeriesCanvas(series.beamHorizontal, sharedMaxVal, "#ffb84d"));
+    beamCanvasWrap.replaceChildren(
+      createValueYAxis(sharedMaxVal),
+      drawBeamCanvas(series.beamHorizontal, series.beamHorizontalActual, sharedMaxVal, "#ffb84d"),
+    );
     diffuseCanvasWrap.replaceChildren(createValueYAxis(sharedMaxVal), drawSeriesCanvas(series.diffuseShaded, sharedMaxVal, "#4fd1c5"));
     sumCanvasWrap.replaceChildren(createValueYAxis(sharedMaxVal), drawSeriesCanvas(series.sum, sharedMaxVal, "#c98bf0"));
 
+    // Based on the theoretical (unshaded) series, not the shading-aware one now also drawn on
+    // this graph — kept consistent with what actually feeds the Sum graph below, so the three
+    // totals still add up exactly (beam + diffuse = sum), same as before this row grew a second
+    // layer.
     beamTotalLabel.textContent = `${integrateToWattHours(series.beamHorizontal).toFixed(0)} ${ENERGY_UNIT}`;
     diffuseTotalLabel.textContent = `${integrateToWattHours(series.diffuseShaded).toFixed(0)} ${ENERGY_UNIT}`;
     sumTotalLabel.textContent = `${integrateToWattHours(series.sum).toFixed(0)} ${ENERGY_UNIT}`;

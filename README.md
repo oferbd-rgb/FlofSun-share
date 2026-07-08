@@ -123,7 +123,10 @@ the file operations npm needs. Work on a real local disk.
   (`animation.simMinutesPerRealSecond` = 15, i.e. 1x = 1 simulated hour per 4 real seconds).
 - **`src/locationPicker.ts`** — the Leaflet world-map panel; click anywhere to relocate, with
   live reverse-geocoding via OpenStreetMap Nominatim (needs internet; falls back to a raw
-  lat/lon label if the request fails).
+  lat/lon label if the request fails). `createLocationPicker` returns its panel `element` (rather
+  than being `void`) so `main.ts` can hide it while 2D model mode is active — there's no 3D scene
+  to relocate the site on there, and the date input takes over that corner instead (see
+  `twoDModel.ts`'s bullet).
 - **`src/geometryControl.ts`** — the "Tracker geometry" panel: number inputs for module length,
   hub height, row spacing, and axis azimuth, writing straight into `appState.ts`'s tracker
   geometry state on change. Module width stays a fixed constant in `config.ts` — not exposed
@@ -233,16 +236,22 @@ the file operations npm needs. Work on a real local disk.
   onto the ground at shallow sun angles.
 
   `main.ts` swaps this in as a full replacement for the 3D canvas (hidden via `display:none`, and
-  its render call skipped entirely while 2D mode is active) while leaving the geometry-control,
-  location-picker, and time-control panels exactly where they are — those describe the same
-  underlying settings regardless of which view is showing. The elevation view's CSS box is shrunk
-  to the upper part of the screen (`height: calc(100% - 400px)`, a fixed pixel reservation rather
-  than a percentage, so it reliably fits regardless of window size) so `main.ts`'s `enterTwoDMode`
-  can push `irradianceGraphs.ts`'s panel in underneath it. Mutually exclusive with the Cumulative
-  Sun Hours report mode (entering either one exits the other first), since both repurpose the same
-  main viewing area. Reads the live, rate-limited `lastRotationDeg` (not a separately computed
-  "ideal" angle), so the tracker's angle here always matches what's actually being rendered in the
-  3D view.
+  its render call skipped entirely while 2D mode is active). The geometry-control panel stays
+  exactly where it is — it describes the same underlying settings regardless of which view is
+  showing — but the location-picker (map) is hidden (there's no 3D scene to relocate the site on
+  in this view) and the date input (normally the first child of `timeControl.element`) is
+  extracted and moved into a small `.two-d-date-corner` panel in its place, via a plain DOM query
+  (`.date-input`) rather than a dedicated `TimeControl` accessor — the rest of the time control is
+  re-parented into `irradianceGraphs.ts`'s panel below instead (see that bullet). `FIELD_MARGIN_M`/
+  `SKY_MARGIN_M` (9m each) pad the view's own `viewBox` well beyond the tracker field itself, for a
+  zoomed-out look. The elevation view's CSS box is shrunk to the upper part of the screen
+  (`height: calc(100% - 400px)`, a fixed pixel reservation rather than a percentage, so it reliably
+  fits regardless of window size) so `main.ts`'s `enterTwoDMode` can push `irradianceGraphs.ts`'s
+  panel in underneath it. Mutually exclusive with the Cumulative Sun Hours report mode (entering
+  either one exits the other first, restoring the date input and the map/time-control to their
+  normal spots), since both repurpose the same main viewing area. Reads the live, rate-limited
+  `lastRotationDeg` (not a separately computed "ideal" angle), so the tracker's angle here always
+  matches what's actually being rendered in the 3D view.
 - **`src/irradianceGraphs.ts`** — the panel `twoDModel.ts`'s elevation view sits above (in 2D
   model mode only). Rather than building a second, separate time control, `main.ts`'s
   `enterTwoDMode`/`exitTwoDMode` physically **re-parent the actual, shared `timeControl.ts`
@@ -259,7 +268,7 @@ the file operations npm needs. Work on a real local disk.
   the DOM nesting actually holds.
 
   Below it: three stacked line/area graphs decomposing horizontal irradiance, sharing one time
-  axis (now the slider's own daylight-bounded range, not a fixed 24h), with a vertical cursor line
+  axis (the slider's own daylight-bounded range, not a fixed 24h), with a vertical cursor line
   synced to the live clock running through the slider and all three graphs. The graphs are
   deliberately additive: `DNI·sin(SE)` (the direct beam's own contribution to a horizontal
   surface), the fully-shaded/sky-only diffuse contribution (`DHI` alone — what the surface would
@@ -273,8 +282,27 @@ the file operations npm needs. Work on a real local disk.
   elsewhere in this project's history) — there's still no live weather data source in this app, so
   treat these as illustrative curve shapes, not measured irradiance.
 
-  Since the slider is preceded by the date input, Play button, and speed select in the same real
-  `timeControl` row, its own left edge doesn't land at a fixed, predictable offset (those
+  The `DNI·sin(SE)` row is actually two overlaid renderings of related-but-different series
+  (`drawBeamCanvas`): a dashed, unfilled outline for the always-unshaded theoretical value (drawn
+  first, so it sits behind — a visible upper bound), and a filled area on top for the same
+  quantity zeroed out whenever a representative row is shaded — inter-row *self*-shading (one row
+  blocking another's own panel), not the ground-shading this app used to compute (removed
+  earlier). `isRepresentativeRowShaded` checks this the same way `twoDModel.ts` raycasts sun rays
+  against panels: pick an interior row (one with a neighbor on each side where possible), cast a
+  ray from its hub toward the sun, and test for an intersection with any *other* row's own panel
+  segment first — reusing the identical parametric segment-segment test. Since this now depends on
+  live geometry (row spacing/hub height/module length feed the raycast, and axis azimuth/max
+  rotation feed the tracking-angle formula), `refresh()` re-runs on `onGeometryChange` too, not
+  just `onStateChange` as before this row grew a second layer — verified by shrinking row spacing
+  to 2.5m and confirming the filled curve visibly flattens below the dashed outline's peak around
+  solar noon, where tight spacing plus near-flat midday tracking angles cause the most
+  self-shading. The row's own `Wh/m^2` total stays based on the *theoretical* series though, not
+  the newly-added shading-aware one — keeping the "two components sum to the third" property
+  intact rather than introducing a different, unrequested inconsistency.
+
+  Since the slider is preceded by the Play button and speed select in the same real `timeControl`
+  row (the date input, formerly also there, is relocated to the top-left corner in 2D mode — see
+  `twoDModel.ts`'s bullet), its own left edge doesn't land at a fixed, predictable offset (those
   elements' rendered widths aren't deterministic across fonts/browsers) — `measureAndAlign()`
   measures the slider's actual `getBoundingClientRect()` every frame (via `updateCursor()`, cheap,
   called from `main.ts`'s frame loop while 2D mode is active) and repositions the graph rows and
@@ -282,7 +310,11 @@ the file operations npm needs. Work on a real local disk.
   `.irradiance-graph-canvas-wrap`'s own padding) so it's the *canvas* — not the row's outer box —
   that lands exactly under the slider. Verified directly: dragging the slider to a known value and
   comparing the cursor's and the canvas's measured screen `left` against the slider's — they
-  matched to sub-pixel precision.
+  matched to sub-pixel precision. `.irradiance-graphs-panel`/`.irradiance-graphs-stack` size to
+  `fit-content` rather than a fixed width — an earlier fixed-width version left graph rows with
+  less remaining layout space than their actual content (canvas + gutter + total label) needed
+  once a large dynamic left-margin was applied, so the overflow silently spilled off the *right*
+  edge of the screen, unclipped and invisible, rather than growing the container to contain it.
 
 The demo tracker is configured as a **1P** (one module wide per row, portrait orientation)
 layout.
