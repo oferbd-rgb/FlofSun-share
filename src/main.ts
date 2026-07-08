@@ -50,8 +50,11 @@ function enterTwoDMode(): void {
   readingsPanel.element.style.display = "none";
   twoDModelView.setVisible(true);
   twoDModelButton.textContent = "Back to 3D model";
-  twoDIrradiancePanel = createIrradianceGraphsPanel();
+  // Re-parents the actual timeControl (see createIrradianceGraphsPanel) — appending the panel
+  // first, then refreshing, since its internal alignment measurements need real layout.
+  twoDIrradiancePanel = createIrradianceGraphsPanel(timeControl);
   app.appendChild(twoDIrradiancePanel.element);
+  twoDIrradiancePanel.refresh();
 }
 
 function exitTwoDMode(): void {
@@ -60,6 +63,9 @@ function exitTwoDMode(): void {
   readingsPanel.element.style.display = "";
   twoDModelView.setVisible(false);
   twoDModelButton.textContent = "2D model";
+  // Move the real timeControl back to its normal spot before removing the panel it's currently
+  // nested in, so it isn't torn out along with it.
+  app.appendChild(timeControl.element);
   twoDIrradiancePanel?.element.remove();
   twoDIrradiancePanel = null;
 }
@@ -248,7 +254,7 @@ function frame() {
 
   if (twoDModeActive) {
     twoDModelView.update(lastRotationDeg, sunDir.x, sunDir.y);
-    twoDIrradiancePanel?.advance(realDeltaSeconds);
+    twoDIrradiancePanel?.updateCursor();
   } else {
     controls.update();
     renderer.render(scene, camera);

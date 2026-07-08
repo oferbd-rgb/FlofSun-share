@@ -120,7 +120,7 @@ the file operations npm needs. Work on a real local disk.
   that range at either end. The underlying schedule storage is still the fixed 48-slot
   00:00-24:00 clock, though — only the rendering is bounds-relative. The speed selector picks a
   rounded multiplier (`config.ts`'s `animation.speedOptions`) of the 1x base rate
-  (`animation.simMinutesPerRealSecond` = 60, i.e. 1x = 1 simulated hour per real second).
+  (`animation.simMinutesPerRealSecond` = 15, i.e. 1x = 1 simulated hour per 4 real seconds).
 - **`src/locationPicker.ts`** — the Leaflet world-map panel; click anywhere to relocate, with
   live reverse-geocoding via OpenStreetMap Nominatim (needs internet; falls back to a raw
   lat/lon label if the request fails).
@@ -244,25 +244,45 @@ the file operations npm needs. Work on a real local disk.
   "ideal" angle), so the tracker's angle here always matches what's actually being rendered in the
   3D view.
 - **`src/irradianceGraphs.ts`** — the panel `twoDModel.ts`'s elevation view sits above (in 2D
-  model mode only): its own self-contained time control (Play button + clock, mirroring
-  `timeControl.ts`'s feature set but entirely independent — it drives only this panel, not the
-  main app clock or the 2D elevation view's tracker rotation) plus three stacked line/area graphs
-  decomposing horizontal irradiance, all sharing one time axis, with a vertical cursor line synced
-  to the slider running through the slider row and all three graphs. The three graphs are
+  model mode only). Rather than building a second, separate time control, `main.ts`'s
+  `enterTwoDMode`/`exitTwoDMode` physically **re-parent the actual, shared `timeControl.ts`
+  instance** into this panel and back out again — so it's the exact same slider, date input, Play
+  button, and tracking/anti-tracking schedule bar the 3D view uses, over the exact same
+  (`getDaylightBounds`-derived) time range, and dragging or playing it genuinely drives the real
+  model clock (tracker rotation, sun position) rather than an independent copy —
+  `timeControl.advance()` already runs unconditionally in `main.ts`'s frame loop regardless of
+  which view is showing, so nothing extra was needed to wire that up. `style.css` scopes an
+  override (`.irradiance-graphs-panel .time-control`) that switches it from its normal
+  `position: fixed` bottom-center placement to a regular in-flow one only while it's nested here,
+  and forces its slider to `GRAPH_WIDTH_PX` (810px, matching the graph canvases) — both purely via
+  CSS specificity, no JS class toggling needed, since the descendant selector only matches while
+  the DOM nesting actually holds.
+
+  Below it: three stacked line/area graphs decomposing horizontal irradiance, sharing one time
+  axis (now the slider's own daylight-bounded range, not a fixed 24h), with a vertical cursor line
+  synced to the live clock running through the slider and all three graphs. The graphs are
   deliberately additive: `DNI·sin(SE)` (the direct beam's own contribution to a horizontal
   surface), the fully-shaded/sky-only diffuse contribution (`DHI` alone — what the surface would
   receive if the beam were completely blocked), and their sum, which is exactly the real unshaded
-  GHI. Values come from a small, self-contained clear-sky approximation (same Meinel & Meinel 1976
-  form used elsewhere in this project's history) — there's still no live weather data source in
-  this app, so treat these as illustrative curve shapes, not measured irradiance. The slider, the
-  graph canvases, and the cursor line all need to share one consistent horizontal scale for the
-  "line through the graphs" effect to actually line up: `GRAPH_INDENT_PX` (100px, matching
-  style.css's label-column + y-axis-gutter width) is applied uniformly to all three so the
-  cursor's `left` position (computed in pixels, not a naive 0-100% that would drift out of
-  alignment given the indent) lands in the same place relative to the slider's thumb and each
-  canvas's own time axis — verified directly (dragging the slider to a known value and checking
-  the cursor's screen position against the slider thumb's). The header row (Play button + clock)
-  is deliberately outside that aligned zone, so it doesn't eat into the fixed-width slider track.
+  GHI (verified directly: the two components' integrated Wh/m^2 totals sum exactly to the third's).
+  All three share one constant vertical scale in `W/m^2` (the sum graph's own max, since sum is
+  always >= either component individually, so it naturally bounds the other two) rather than each
+  auto-scaling independently — and each graph's row shows the cumulative area under its curve
+  (`integrateToWattHours`, a simple rectangle-sum integral) in `Wh/m^2` to its right. Values come
+  from a small, self-contained clear-sky approximation (same Meinel & Meinel 1976 form used
+  elsewhere in this project's history) — there's still no live weather data source in this app, so
+  treat these as illustrative curve shapes, not measured irradiance.
+
+  Since the slider is preceded by the date input, Play button, and speed select in the same real
+  `timeControl` row, its own left edge doesn't land at a fixed, predictable offset (those
+  elements' rendered widths aren't deterministic across fonts/browsers) — `measureAndAlign()`
+  measures the slider's actual `getBoundingClientRect()` every frame (via `updateCursor()`, cheap,
+  called from `main.ts`'s frame loop while 2D mode is active) and repositions the graph rows and
+  cursor line to match, correcting each graph row by `Y_AXIS_GUTTER_PX` (36px, matching
+  `.irradiance-graph-canvas-wrap`'s own padding) so it's the *canvas* — not the row's outer box —
+  that lands exactly under the slider. Verified directly: dragging the slider to a known value and
+  comparing the cursor's and the canvas's measured screen `left` against the slider's — they
+  matched to sub-pixel precision.
 
 The demo tracker is configured as a **1P** (one module wide per row, portrait orientation)
 layout.

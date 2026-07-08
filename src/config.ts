@@ -64,7 +64,7 @@ export const scene = {
 };
 
 export const animation = {
-  simMinutesPerRealSecond: 30, // 1x speed = 1 simulated hour per 2 real seconds
+  simMinutesPerRealSecond: 15, // 1x speed = 1 simulated hour per 4 real seconds (halved per feedback)
   speedOptions: [1, 2, 5, 10, 20], // selectable multiples of the 1x base rate above
   defaultSpeedMultiplier: 1,
 };

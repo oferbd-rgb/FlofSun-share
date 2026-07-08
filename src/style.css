@@ -328,68 +328,56 @@ canvas {
   border-bottom: 1px solid var(--panel-border);
 }
 
-/* Wraps the slider row + graph rows + x-axis row, all indented by the same 100px (label + y-axis
-   gutter) so the slider's track, the graph canvases, and the vertical cursor line all share one
-   consistent horizontal (time) scale. */
+/* Wraps the (real, re-parented) time control and the graph rows together so the cursor line's
+   height can span both, and so alignment measurements (main.ts/irradianceGraphs.ts) are relative
+   to one common ancestor. Row-level left margins are set dynamically in JS to match wherever the
+   real slider actually renders, not a fixed value — see measureAndAlign() in irradianceGraphs.ts. */
 .irradiance-graphs-stack {
   position: relative;
   width: 910px;
 }
 
-/* Deliberately NOT indented/width-constrained to GRAPH_WIDTH_PX like the slider/graph rows below
-   — this is just a small control row, not part of the shared time-axis alignment. */
-.irradiance-time-header-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 6px;
+/* Overrides .time-control's normal `position: fixed` bottom-center placement while it's
+   re-parented into this panel (2D model mode only — see main.ts's enterTwoDMode/exitTwoDMode),
+   so it lays out in-flow instead of floating independently over the graphs. Higher specificity
+   than the base `.time-control` rule (two classes vs. one), so no `!important` needed. */
+.irradiance-graphs-panel .time-control {
+  position: static;
+  left: auto;
+  bottom: auto;
+  transform: none;
+  margin: 0 0 10px;
+  width: fit-content;
 }
 
-.irradiance-time-header-row button {
-  padding: 4px 12px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: #2a3040;
-  color: var(--text-primary);
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.irradiance-time-header-row button:hover {
-  background: #38405a;
-}
-
-.irradiance-clock-readout {
-  font-variant-numeric: tabular-nums;
-  font-size: 16px;
-  font-family: var(--mono-font);
-}
-
-.irradiance-time-slider-row {
-  margin-left: 100px;
+/* Forces the embedded slider to the same width as the graph canvases below, so both share one
+   horizontal (time) scale — normally 320px (style.css's .time-control rule), sized for the
+   bottom-center 3D view instead. */
+.irradiance-graphs-panel .time-control input[type="range"] {
   width: 810px;
-  margin-bottom: 4px;
-}
-
-.irradiance-time-slider-row input[type="range"] {
-  width: 100%;
 }
 
 .irradiance-graph-row {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 10px;
   margin-bottom: 2px;
 }
 
+/* Positioned absolutely (out of flow) so the row's own box starts at its canvas-wrap, not here —
+   otherwise the row's dynamically-set left margin (measureAndAlign) would need to additionally
+   account for the label's own width, not just the canvas-wrap's y-axis gutter. */
 .irradiance-graph-label {
+  position: absolute;
+  right: calc(100% + 6px);
+  top: 50%;
+  transform: translateY(-50%);
   width: 60px;
-  flex-shrink: 0;
+  text-align: right;
   font-size: 11px;
   font-weight: 600;
   color: var(--text-muted);
-  text-align: right;
-  padding-right: 4px;
 }
 
 .irradiance-graph-canvas-wrap {
@@ -419,9 +407,15 @@ canvas {
   color: var(--text-muted);
 }
 
+.irradiance-graph-total {
+  font-size: 12px;
+  font-family: var(--mono-font);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
 .irradiance-graph-axis-x-row {
   position: relative;
-  margin-left: 100px;
   width: 810px;
   height: 16px;
 }
